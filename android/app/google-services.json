@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "726734031211",
+    "project_id": "morjodi-7366c",
+    "storage_bucket": "morjodi-7366c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:726734031211:android:20a4ce994fe79d5506e42e",
+        "android_client_info": {
+          "package_name": "com.morjodi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6BfZz65m1NNWCOv3Y8l3Gj3_aUF_CWmw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,830 @@
+{
+  "onboarding": {
+    "slide1_title": "Begin your new journey of marriage",
+    "slide1_desc": "With your Chhattisgarh wedding culture and traditions.",
+    "slide2_title": "Find your Chhattisgarhi Jodidaar",
+    "slide2_desc": "Every Chhattisgarh people will find a perfect life partner here.",
+    "slide3_title": "Start with a free chat",
+    "slide3_desc": "Chat, connect, understand, and build relationships with Mor Jodi",
+    "register": "New user? Register for Free",
+    "login": "Existing user? Login"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "sendOtp": "SEND OTP",
+    "email": "Email ID",
+    "phone": "Phone Number",
+    "mobile": "Mobile",
+    "noAccount": "Don't have an account? Register Now!",
+    "enterEmail": "Enter your email",
+    "enterPhone": "Enter your phone number",
+    "enterMobile": "Enter your mobile number",
+    "loginModeUnavailable": "Login mode unavailable!",
+    "somethingWentWrong": "Something went wrong",
+    "error": "Error"
+  },
+  "otp": {
+    "sentTo": "OTP sent to {{value}}",
+    "expiresIn": "OTP expires in",
+    "verify": "Verify OTP",
+    "resend": "Resend OTP",
+    "enterOtpError": "Please enter a 6-digit OTP.",
+    "error": "Error",
+    "somethingWrong": "Something went wrong",
+    "otpResent": "OTP has been resent.",
+    "resendFailed": "Failed to resend OTP. Please try again later."
+  },
+  "private_profile": "This profile is private",
+  "like": "Like",
+  "share": "Share",
+  "message": "Message",
+  "register": {
+    "title": "Register",
+    "page1": "Account Setup",
+    "page2": "Personal Details",
+    "page3": "Background Details",
+    "page4": "Photos",
+    "page5": "ID Verification",
+    "page6": "Final Details & Privacy",
+    "submit": "Register & Get OTP",
+    "fullName": "Full Name *",
+    "email": "Email ID *",
+    "phone": "Phone Number *",
+    "next": "Next",
+    "validationtext": {
+      "page1": "Please fill in your Full Name and provide an Email ID or Phone Number.",
+      "personalDetails": "Please fill in all required personal details, including Date of Birth.",
+      "backgroundDetails": "Please select all required background details.",
+      "finalDetails": "Please fill in all required lifestyle, income, and about details.",
+      "aboutMeMin": "About Me must be at least {{min}} characters long"
+    },
+    "ageError": "You must be at least 18 years old to register.",
+    "registerFailed": "Something went wrong during registration.",
+    "error": "Error",
+    "ageRequirement": "Age Requirement",
+    "validation": "Validation",
+    "labels": {
+      "email": "Email ID",
+      "phone": "Phone Number",
+      "mobilenumber": "Enter your mobile number",
+      "fullName": "Full Name",
+      "gender": "Gender",
+      "profileFor": "Profile For",
+      "maritalStatus": "Marital Status",
+      "children": "Children",
+      "manglik": "Manglik",
+      "dob": "Date of Birth",
+      "height": "Height",
+      "religion": "Religion",
+      "caste": "Caste",
+      "subCaste": "Sub Caste",
+      "gotra": "Gotra",
+      "raasi": "Raasi",
+      "motherTongue": "Mother Tongue",
+      "profession": "Profession",
+      "education": "Education",
+      "location": "Location",
+      "familyDetails": "Family Details",
+      "fatherStatus": "Father's Status",
+      "motherStatus": "Mother's Status",
+      "brothers": "No. of Brothers",
+      "sisters": "No. of Sisters",
+      "familyType": "Family Type",
+      "familyValues": "Family Values",
+      "familyLocation": "Family Location",
+      "lifestyle": "Lifestyle",
+      "diet": "Diet",
+      "smoking": "Smoking",
+      "drinking": "Drinking",
+      "privacy": "Privacy Settings",
+      "profileVisibility": "Profile Visibility",
+      "photoVisibility": "Photo Visibility",
+      "contactVisibility": "Contact Visibility",
+      "income&about": "Income and About",
+      "income": "Annual Income",
+      "about": "About Me",
+      "aadharImage": "Aadhar Card Image",
+      "panImage": "Pan Card Image",
+      "profilePhotos": "Profile Photos",
+      "referralCode": "Referral Code"
+    },
+    "actions": {
+      "uploadAadhar": "Upload Aadhar Image",
+      "uploadPan": "Upload Pan Card Image",
+      "addPhotos": "Add Profile Photos (Max 5)"
+    },
+    "optional": "(Optional)",
+    "annualIncome": "Annual Income (e.g., 5 Lakhs) *",
+    "aboutMe": "Tell us about yourself (min 50 characters)",
+    "placeholders": {
+      "selectProfileCreator": "Select who is creating this profile",
+      "selectMaritalStatus": "Select Marital Status",
+      "selectChildren": "Select Children Details",
+      "manglikQuestion": "Are you Manglik?",
+      "selectDate": "Select Date",
+      "loadingMeta": "Loading meta data...",
+      "selectReligion": "Select Religion",
+      "selectCaste": "Select Caste",
+      "selectSubCasteOptional": "Select Sub Caste (Optional)",
+      "selectGotraOptional": "Select Gotra (Optional)",
+      "selectMotherTongue": "Select Mother Tongue",
+      "selectRaasiOptional": "Select Raasi (Optional)",
+      "selectProfession": "Select Profession",
+      "selectEducation": "Select one or more educations",
+      "searchEducation": "Search education...",
+      "selectCurrentLocation": "Select Current Location",
+      "selectFatherStatus": "Select Father's Status",
+      "selectMotherStatus": "Select Mother's Status",
+      "selectFamilyType": "Select Family Type",
+      "selectFamilyValues": "Select Family Values",
+      "selectFamilyLocation": "Select Family Location",
+      "selectDiet": "Select Diet",
+      "smokingHabit": "Smoking Habit",
+      "drinkingHabit": "Drinking Habit",
+      "profileVisibility": "Profile Visibility",
+      "photoVisibility": "Photo Visibility",
+      "contactVisibility": "Contact Visibility"
+    }
+  },
+  "editProfile": {
+    "alerts": {
+      "success": "Success",
+      "error": "Error",
+      "validation": "Validation",
+      "profileImageRemoved": "Profile image removed successfully.",
+      "idImageRemoved": "{{type}} card image removed successfully.",
+      "photoRemovedServer": "Photo removed from server.",
+      "photoRemovedLocal": "Photo removed locally.",
+      "removeFailed": "Failed to remove image.",
+      "removeImageError": "Something went wrong while removing the image.",
+      "removeIdImageError": "Something went wrong while removing the {{type}} card image.",
+      "deletePhotoFailedServer": "Failed to delete photo from server.",
+      "fetchMetaFailed": "Failed to fetch background options.",
+      "saveValidation": "Please fill in Full Name, Email, and Phone Number.",
+      "profileUpdated": "Profile updated successfully!",
+      "saveFailed": "Something went wrong."
+    },
+    "labels": {
+      "email": "Email ID",
+      "phone": "Phone Number",
+      "fullName": "Full Name",
+      "gender": "Gender",
+      "profileFor": "Profile For",
+      "maritalStatus": "Marital Status",
+      "children": "Children",
+      "mobile": "Mobile",
+      "manglik": "Manglik",
+      "dob": "Date of Birth",
+      "height": "Height",
+      "religion": "Religion",
+      "caste": "Caste",
+      "subCaste": "Sub Caste",
+      "gotra": "Gotra",
+      "raasi": "Raasi",
+      "motherTongue": "Mother Tongue",
+      "profession": "Profession",
+      "education": "Education",
+      "location": "Location",
+      "familyDetails": "Family Details",
+      "fatherStatus": "Father's Status",
+      "motherStatus": "Mother's Status",
+      "brothers": "No. of Brothers",
+      "sisters": "No. of Sisters",
+      "familyType": "Family Type",
+      "familyValues": "Family Values",
+      "familyLocation": "Family Location",
+      "lifestyle": "Lifestyle",
+      "diet": "Diet",
+      "smoking": "Smoking",
+      "drinking": "Drinking",
+      "privacy": "Privacy Settings",
+      "profileVisibility": "Profile Visibility",
+      "photoVisibility": "Photo Visibility",
+      "contactVisibility": "Contact Visibility",
+      "income&about": "Income and About",
+      "income": "Annual Income",
+      "about": "About Me",
+      "aadharImage": "Aadhar Card Image",
+      "panImage": "Pan Card Image",
+      "profilePhotos": "Profile Photos",
+      "prevPhotos": "Previous Photos",
+      "newPhotos": "New Photos",
+      "expectedPartnerIncome ": "Expected Partner Income ",
+      "preferredMaritalStatus": "Preferred Marital Status",
+      "preferredChildren": "Preferred Children",
+      "manglikPreference": "Manglik Preference",
+      "ageRange": "Preferred Age Range",
+      "minAge": "Minimum Age",
+      "maxAge": "Maximum Age",
+      "heightRange": "Preferred Height Range",
+      "preferredReligions": "Preferred Religions",
+      "preferredCastes": "Preferred Castes",
+      "preferredSubCastes": "Preferred Sub Castes",
+      "preferredGotras": "Preferred Gotras",
+      "preferredRaasi": "Preferred Raasi",
+      "preferredEducation": "Preferred Education",
+      "preferredProfessions": "Preferred Professions",
+      "preferredLocations": "Preferred Locations",
+      "expectedPartnerIncome": "Expected Partner Income",
+      "to": "to"
+    },
+    "actions": {
+      "takeImage": "Take Image",
+      "removeImage": "Remove Image",
+      "selectDob": "Select Date of Birth",
+      "uploadAadhar": "Upload/Change Aadhar Image",
+      "uploadPan": "Upload/Change Pan Card Image",
+      "addPhotos": "Add Profile Photos"
+    },
+    "sections": {
+      "basic": "Basic Info",
+      "personal": "Personal Details",
+      "background": "Background Details",
+      "family": "Family & Lifestyle",
+      "partner": "Partner Preferences",
+      "photos": "ID & Photos"
+    },
+    "optional": "(Optional)",
+    "annualIncome": "Annual Income (e.g., 5 Lakhs) *",
+    "aboutMe": "Tell us about yourself (min 50 characters)",
+    "aboutMeMin": "About Me must be at least {{min}} characters long",
+    "placeholders": {
+      "fullName": "Enter your full name",
+      "email": "Enter your email address",
+      "phone": "Enter your phone number",
+      "selectProfileCreator": "Select who is creating this profile",
+      "selectMaritalStatus": "Select Marital Status",
+      "selectChildren": "Select Children Details",
+      "manglikQuestion": "Are you Manglik?",
+      "selectDate": "Select Date",
+      "loadingMeta": "Loading meta data...",
+      "selectReligion": "Select Religion",
+      "selectCaste": "Select Caste",
+      "selectSubCasteOptional": "Select Sub Caste (Optional)",
+      "selectGotraOptional": "Select Gotra (Optional)",
+      "selectMotherTongue": "Select Mother Tongue",
+      "selectRaasiOptional": "Select Raasi (Optional)",
+      "selectProfession": "Select Profession",
+      "selectEducation": "Select one or more educations",
+      "searchEducation": "Search education...",
+      "selectCurrentLocation": "Select Current Location",
+      "selectFatherStatus": "Select Father's Status",
+      "selectMotherStatus": "Select Mother's Status",
+      "selectFamilyType": "Select Family Type",
+      "selectFamilyValues": "Select Family Values",
+      "selectFamilyLocation": "Select Family Location",
+      "selectDiet": "Select Diet",
+      "smokingHabit": "Smoking Habit",
+      "drinkingHabit": "Drinking Habit",
+      "profileVisibility": "Profile Visibility",
+      "photoVisibility": "Photo Visibility",
+      "contactVisibility": "Contact Visibility",
+      "expectedPartnerIncome": "Expected Partner Income (e.g. ₹5 Lakh / year)",
+      "selectPreferredMaritalStatus": "Select Preferred Marital Status",
+      "preferredChildrenStatus": "Preferred Children Status",
+      "minAge": "Min Age",
+      "maxAge": "Max Age",
+      "preferredReligions": "Select preferred religions",
+      "preferredCastes": "Select preferred castes",
+      "preferredSubCastes": "Select preferred subcastes",
+      "preferredGotras": "Select preferred gotras",
+      "preferredRaasi": "Select preferred raasi",
+      "preferredEducation": "Select preferred education",
+      "preferredProfessions": "Select preferred professions",
+      "preferredLocations": "Select preferred locations"
+    }
+  },
+  "drawer": {
+    "userNameFallback": "User Name",
+    "userId": "ID",
+    "upgradeMembership": "Upgrade Membership",
+    "offerText": "UP TO 39% OFF ALL MEMBERSHIP PLANS",
+    "profile": "Install Mor Jodi App from Play Store 👇\n{{link}}\n\nMy Profile ID (use while signup):\n{{id}}",
+    "menu": {
+      "editProfile": "Edit Profile",
+      "likedProfiles": "Liked Profiles",
+      "blockedProfiles": "Blocked Profiles",
+      "partnerPreferences": "Partner Preferences",
+      "searchByUser": "Search by User",
+      "wallet": "Your Wallet",
+      "referrals": "My Referrals",
+      "accountSettings": "Account & Settings",
+      "languageSettings": "Language Settings",
+      "complaint": "Make a Complaint / Report",
+      "contactUs": "Contact Us",
+      "aboutUs": "About Us",
+      "termsPrivacy": "Terms and Privacy",
+      "logout": "Logout"
+    },
+    "share": {
+      "installText": "Install Mor Jodi App from Play Store 👇",
+      "profileIdHint": "My Profile ID (Use while signup):"
+    }
+  },
+  "likedProfiles": {
+    "title": "Liked Profiles",
+    "loading": "Loading liked profiles...",
+    "errorLoad": "Failed to load liked profiles.",
+    "empty": {
+      "title": "No profiles liked yet."
+    },
+    "profile": {
+      "ageUnit": "yrs"
+    },
+    "actions": {
+      "unlike": "Unlike"
+    },
+    "alerts": {
+      "openProfileFailed": "Unable to open profile. Please try again."
+    },
+    "subscription": {
+      "privateProfile": "This profile is private. Upgrade your plan to unlock {{name}}.",
+      "limitReached": "You have reached your view limit. Upgrade to continue."
+    }
+  },
+  "about": {
+    "titleFallback": "About Us",
+    "loading": "Loading about information...",
+    "errorLoad": "Failed to load about information.",
+    "empty": "No about information available."
+  },
+  "accountSettings": {
+    "options": {
+      "notifications": "Notifications",
+      "privacySettings": "Privacy Settings",
+      "deleteAccount": "Delete Account"
+    },
+    "delete": {
+      "modalTitle": "Reason for Deletion",
+      "submit": "Submit",
+      "reasons": {
+        "foundPartner": "I found my partner on this app",
+        "notSatisfied": "I am not satisfied with the app",
+        "gettingMarried": "I am getting married",
+        "privacyConcern": "I have privacy concerns",
+        "other": "Other"
+      }
+    },
+    "alerts": {
+      "selectReasonErrorTitle": "Error",
+      "selectReasonErrorMsg": "Please select a reason for deletion.",
+      "successTitle": "Success",
+      "successMsg": "Your account deletion request has been submitted.",
+      "errorTitle": "Error",
+      "genericError": "Something went wrong."
+    }
+  },
+  "activity": {
+    "title": "Activity",
+    "summary": {
+      "interests": "Interests",
+      "visitors": "Visitors",
+      "liked": "Liked",
+      "blocked": "Blocked"
+    },
+    "sections": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "earlier": "Earlier"
+    },
+    "notifications": {
+      "title": "Your Notifications",
+      "empty": "No new notifications"
+    },
+    "alerts": {
+      "profileApprovedTitle": "Profile Approved",
+      "profileApprovedMsg": "Your profile has been approved by admin.",
+      "openProfileErrorTitle": "Error",
+      "openProfileErrorMsg": "Unable to open profile. Please try again.",
+      "upgradeVisitors": "To see who viewed your profile, please upgrade your plan."
+    }
+  },
+  "advancedSearch": {
+    "title": "Search Filters",
+    "sections": {
+      "ageHeight": "Age & Height",
+      "background": "Background"
+    },
+    "labels": {
+      "heightRange": "Height",
+      "annualIncome": "Annual Income"
+    },
+    "units": {
+      "to": "to",
+      "cm": "cm"
+    },
+    "filters": {
+      "religion": "Religion",
+      "caste": "Caste",
+      "subCaste": "Sub Caste",
+      "gotra": "Gotra",
+      "motherTongue": "Mother Tongue",
+      "raasi": "Raasi",
+      "location": "Location",
+      "maritalStatus": "Marital Status",
+      "children": "Children",
+      "manglik": "Manglik",
+      "education": "Education",
+      "profession": "Profession",
+      "diet": "Diet",
+      "smoking": "Smoking",
+      "drinking": "Drinking",
+      "familyType": "Family Type",
+      "familyValues": "Family Values"
+    },
+    "placeholders": {
+      "minAge": "Min Age",
+      "maxAge": "Max Age",
+      "annualIncome": "Enter annual income",
+      "religion": "Select religion",
+      "caste": "Select caste",
+      "subCaste": "Select sub caste",
+      "gotra": "Select gotra",
+      "motherTongue": "Select mother tongue",
+      "raasi": "Select raasi",
+      "location": "Select location",
+      "maritalStatus": "Select marital status",
+      "children": "Select children status",
+      "manglik": "Select manglik",
+      "education": "Select education",
+      "profession": "Select profession",
+      "diet": "Select diet",
+      "smoking": "Select smoking habit",
+      "drinking": "Select drinking habit",
+      "familyType": "Select family type",
+      "familyValues": "Select family values",
+      "searchDropdown": "Search..."
+    },
+    "options": {
+      "neverMarried": "Never Married",
+      "divorced": "Divorced",
+      "widowed": "Widowed",
+      "noChildren": "No Children",
+      "oneChild": "1 Child",
+      "twoChildren": "2 Children",
+      "threePlusChildren": "3+ Children",
+      "yes": "Yes",
+      "no": "No",
+      "veg": "Vegetarian",
+      "nonVeg": "Non-Vegetarian",
+      "nuclear": "Nuclear",
+      "joint": "Joint"
+    },
+    "buttons": {
+      "search": "Search Matches"
+    },
+    "messages": {
+      "loadingMeta": "Loading options...",
+      "metaError": "Failed to load metadata.",
+      "noResults": "No profiles found matching your criteria."
+    }
+  },
+  "profiles": {
+    "empty": "No profiles here.",
+    "loading": "Loading profiles..."
+  },
+  "blockedProfiles": {
+    "empty": "No blocked profiles.",
+    "age": "yrs",
+    "unblock": {
+      "title": "Unblock User",
+      "confirm": "Are you sure you want to unblock {{name}}?",
+      "cancel": "Cancel",
+      "action": "Unblock"
+    }
+  },
+  "profile": {
+    "private": "This profile is private. Upgrade to view {{name}}.",
+    "limitReached": "You reached your view limit.",
+    "openError": "Unable to open profile."
+  },
+  "complaint": {
+    "title": "Your Complaints",
+    "empty": "No complaints submitted yet.",
+    "typeLabel": "Complaint Type",
+    "typePlaceholder": "Select complaint type",
+    "typeGeneral": "General Complaint",
+    "typeUser": "Report a User",
+    "reportedUserLabel": "Reported User ID",
+    "reportedUserPlaceholder": "Enter User ID to Report",
+    "subjectLabel": "Subject",
+    "subjectPlaceholder": "Subject",
+    "messageLabel": "Message",
+    "messagePlaceholder": "Message",
+    "pickImage": "Pick Image",
+    "submit": "Submit Complaint",
+    "successTitle": "Success",
+    "successMsg": "Your complaint has been submitted successfully.",
+    "errorTitle": "Error",
+    "errorFill": "Please fill in all fields.",
+    "errorUserId": "Please enter the ID of the user you want to report.",
+    "errorFetch": "Failed to fetch your complaints.",
+    "errorSubmit": "An error occurred while submitting your complaint.",
+    "status": {
+      "label": "Status",
+      "open": "OPEN",
+      "inProgress": "IN PROGRESS",
+      "closed": "CLOSED"
+    },
+    "adminResponse": "Admin Response",
+    "submittedOn": "Submitted On",
+    "reportedUser": "Reported User ID"
+  },
+  "contact": {
+    "errorLoad": "Failed to load contact information.",
+    "email": "Email",
+    "phone": "Phone",
+    "address": "Address",
+    "na": "N/A",
+    "empty": "No contact information available."
+  },
+  "idSearch": {
+    "title": "Search by User ID",
+    "inputPlaceholder": "Enter User ID",
+    "search": "Search",
+    "errorTitle": "Error",
+    "invalidId": "Please enter a valid User ID",
+    "noUserTitle": "No User Found",
+    "noUserDesc": "We couldn’t find any profile with this ID."
+  },
+  "interest": {
+    "tabs": {
+      "received": "Received",
+      "sent": "Sent"
+    },
+    "age": "yrs",
+    "empty": {
+      "received": "No received interests yet.",
+      "sent": "No sent interests yet."
+    },
+    "actions": {
+      "accept": "Accept",
+      "decline": "Decline",
+      "unsend": "Unsend",
+      "remove": "Remove",
+      "sendAgain": "Send Again",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "respond": "Respond"
+    },
+    "alerts": {
+      "unsendTitle": "Unsend?",
+      "unsendMsg": "Remove your interest?",
+      "respondMsg": "How do you want to respond?",
+      "removeTitle": "Remove Interest?",
+      "removeMsg": "This will remove the mutual accepted interest.",
+      "sendAgainTitle": "Send Again?",
+      "sendAgainMsg": "This user declined earlier. Send again?",
+      "acceptConfirm": "Accept this interest?",
+      "declineConfirm": "Decline this interest?"
+    }
+  },
+  "common": {
+    "success": "Success",
+    "error": "Error",
+    "cancel": "Cancel",
+    "unsend": "Unsend"
+  },
+  "unsend_interest_title": "Unsend Interest?",
+  "unsend_interest_message": "Are you sure you want to unsend this interest?",
+  "cancel": "Cancel",
+  "unsend": "Unsend",
+  "accept_interest_title": "Accept Interest?",
+  "accept_interest_message": "Do you want to accept this interest?",
+  "accept": "Accept",
+  "remove_interest_title": "Remove Interest?",
+  "remove_interest_message": "Do you want to remove this interest?",
+  "remove": "Remove",
+  "upgrade": {
+    "title": "Upgrade Membership",
+    "needHelp": "Need Help ?",
+    "month": "{{count}} Month",
+    "walletBalance": "Wallet Balance: ₹{{amount}}",
+    "finalPayable": "Final Payable: ₹{{amount}}",
+    "activePlanDetails": "Active Plan Details",
+    "plan": "Plan",
+    "activatedOn": "Activated On",
+    "expiresOn": "Expires On",
+    "currentPlan": "Current Plan",
+    "activate": "Activate",
+    "upgrade": "Upgrade",
+    "pay": "Pay ₹{{amount}}",
+    "needHelpTitle": "Need help deciding?",
+    "needHelpSubtitle": "Our team is here to help you choose the best plan.",
+    "callUs": "Call Us",
+    "emailUs": "Email Us",
+    "features": "Features",
+    "coupon": {
+      "title": "Apply Coupon",
+      "placeholder": "Enter coupon code",
+      "apply": "Apply",
+      "remove": "Remove",
+      "applied": "Applied",
+      "appliedCode": "Applied: {{code}}",
+      "discountApplied": "Coupon discount: Rs. {{amount}}",
+      "enterCode": "Enter a coupon code.",
+      "notAvailable": "Coupon not available for this plan.",
+      "applyFailed": "Failed to apply coupon."
+    },
+    "common": {
+      "error": "Error",
+      "success": "Success",
+      "sessionExpired": "Session Expired"
+    },
+    "alerts": {
+      "loginFirst": "Please login first.",
+      "selectPlan": "Please select a plan first.",
+      "freePlanActivated": "Free plan activated successfully!",
+      "freePlanFailed": "Failed to activate free plan.",
+      "walletSuccess": "Subscription activated using wallet.",
+      "paymentSuccess": "Subscription activated successfully!",
+      "paymentFailed": "Payment failed. Please try again.",
+      "loginAgain": "Please log in again.",
+      "planLoadFailed": "Failed to load plans."
+    },
+    "section": {
+      "planDuration": "Plan Duration",
+      "billing": "Billing"
+    },
+    "billing": {
+      "summary": "Billing summary",
+      "planTotal": "Plan total",
+      "couponDiscount": "Coupon discount",
+      "useWallet": "Use wallet",
+      "finalPayable": "Final payable",
+      "duration": "Duration: {{count}} days"
+    },
+    "activeBadge": "Active"
+  },
+  "headers": {
+    "editProfile": "Edit Profile",
+    "accountSettings": "Account Settings",
+    "languageSettings": "Language Settings",
+    "privacySettings": "Privacy Settings",
+    "notificationSettings": "Notification Settings",
+    "idWiseSearch": "ID Wise Search",
+    "likedProfiles": "Liked Profiles",
+    "blockedProfiles": "Blocked Profiles",
+    "profileVisitors": "Profile Visitors",
+    "interestRequests": "Interest Requests",
+    "complaint": "Complaint Box",
+    "wallet": "Wallet",
+    "referral": "Referral",
+    "termsPrivacy": "Terms & Privacy",
+    "about": "About",
+    "contact": "Contact",
+    "login": "Login",
+    "otpVerification": "OTP Verification",
+    "otpVerify": "OTP Verification"
+  },
+  "languageSetting": {
+    "language": "Language Settings",
+    "english": "English",
+    "hindi": "Hindi"
+  },
+  "privacy": {
+    "profileVisibility": "Profile Visibility",
+    "photoVisibility": "Photo Visibility",
+    "contactVisibility": "Contact Visibility",
+    "public": "Public",
+    "private": "Private",
+    "save": "Save Privacy Settings",
+    "success": "Privacy settings updated successfully.",
+    "error": "Something went wrong."
+  },
+  "notifications": {
+    "title": "Push Notifications",
+    "receive": "Receive Push Notifications",
+    "description": "Turn off to stop receiving push notifications from the app.",
+    "save": "Save Notification Settings",
+    "success": "Notification settings updated successfully.",
+    "error": "Something went wrong."
+  },
+  "tabs": {
+    "home": "Home",
+    "matches": "Matches",
+    "activity": "Activity",
+    "messenger": "Messenger",
+    "upgrade": "Upgrade"
+  },
+  "header": {
+    "home": "Home",
+    "activity": "Activity",
+    "notifications": "Notifications"
+  },
+  "wallet": {
+    "balance": "Balance",
+    "transactionHistory": "Transaction History",
+    "noTransactions": "No transactions yet."
+  },
+  "referral": {
+    "history": "Referral History",
+    "noReferrals": "No referrals yet.",
+    "shareMessage": "Install Mor Jodi App using the link below:\n{{link}}\n\nMy Referral Code: {{code}}\nUse this code while signup 🎁"
+  },
+  "premium": {
+    "title": "Premium Matches ({{count}})",
+    "empty": "No Premium Profiles Available"
+  },
+  "nearby": {
+    "title": "Nearby Matches ({{count}})",
+    "empty": "No Nearby Matches Found"
+  },
+  "follow": {
+    "title": "Follow Us",
+    "platforms": {
+      "facebook": "Facebook",
+      "twitter": "Twitter",
+      "instagram": "Instagram",
+      "linkedin": "LinkedIn",
+      "youtube": "YouTube",
+      "whatsapp": "WhatsApp"
+    }
+  },
+  "app": {
+    "name": "Mor Jodi"
+  },
+  "customeHeaders": {
+    "home": "Home",
+    "messenger": "Messages",
+    "matches": "Matches",
+    "activity": "Activity"
+  },
+  "messenger": {
+    "empty": "No messages yet.",
+    "noMessages": "No messages yet"
+  },
+  "commonmessanger": {
+    "you": "You",
+    "image": "Image"
+  },
+  "matchTabs": {
+    "all": "All",
+    "verified": "Verified",
+    "yourmatches": "Your Matches",
+    "nearby": "Nearby",
+    "justjoined": "Just Joined"
+  },
+  "nearby2": {
+    "title": "Nearby",
+    "empty": "No nearby profiles found"
+  },
+  "yourMatches": {
+    "empty": "No matched profiles found."
+  },
+  "justJoined": {
+    "empty": "No profiles joined recently."
+  },
+  "verified": {
+    "empty": "No verified profiles found."
+  },
+  "subscriptionModel": {
+    "upgrade_required": "Upgrade Required",
+    "view_plans": "View Plans",
+    "subscription_default": "You need an active subscription to view {{name}}."
+  },
+  "profileDetail": {
+    "tabs": {
+      "about": "About",
+      "family": "Family",
+      "lookingFor": "Looking For",
+      "match": "Match"
+    },
+    "about": "About",
+    "familySection": "Family",
+    "lookingForSection": "Looking For",
+    "matchSection": "Match",
+    "age": "Age",
+    "height": "Height",
+    "religion": "Religion",
+    "caste": "Caste",
+    "subCaste": "Sub Caste",
+    "maritalStatus": "Marital Status",
+    "children": "Children",
+    "raasi": "Raasi",
+    "diet": "Diet",
+    "drinking": "Drinking",
+    "smoking": "Smoking",
+    "motherTongue": "Mother Tongue",
+    "education": "Education",
+    "profession": "Profession",
+    "location": "Location",
+    "expectedIncome": "Expected Income",
+    "fatherStatus": "Father's Status",
+    "motherStatus": "Mother's Status",
+    "familyType": "Family Type",
+    "familyValues": "Family Values",
+    "brothers": "Brothers",
+    "sisters": "Sisters",
+    "familyLocation": "Family Location",
+    "ageRange": "Age Range",
+    "heightRange": "Height Range",
+    "preferredLocation": "Preferred Location",
+    "preferredIncome": "Expected Income",
+    "matchTitle": "Match",
+    "matchUnavailable": "Match data not available.",
+    "matchedCriteriaTitle": "Matched Criteria:",
+    "noMatchingCriteria": "No matching criteria found yet."
+  }
+}
