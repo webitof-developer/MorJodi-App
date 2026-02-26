@@ -134,3 +134,22 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Project build artifacts
+
+# React Native / Android
+android/.gradle/
+android/app/build/
+android/build/
+android/app/.cxx/
+android/.cxx/
+*.keystore
+
+# C++ build
+.cxx/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
