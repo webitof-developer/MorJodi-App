@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import {
   View,
   Text,
@@ -27,27 +27,72 @@ import {
   fetchUnreadNotificationCount,
   markLocalNotificationAsRead,
   fetchUnreadUserNotificationCount,
+  markMessageNotificationsByChatAsRead,
 } from '../redux/slices/notificationSlice';
+import { fetchUnreadMessageCount } from '../redux/slices/messageSlice';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LanguageContext } from '../contexts/LanguageContext';
+import i18n from '../localization/i18n';
+import { useProfileActions } from '../contexts/ProfileActionsContext';
 
 const MessageScreen = ({ route, navigation }) => {
   const { chatId, notificationId } = route.params || {};
   const { token, user } = useSelector(state => state.auth);
-  const { subscription } = useSelector(state => state.subscription);
   const dispatch = useDispatch();
+  const { language } = useContext(LanguageContext);
+  const t = (key, opts) => i18n.t(key, { locale: language, ...opts });
+
+  const {
+    openProfileById,
+    subscriptionModalVisible,
+    subscriptionModalMessage,
+    setSubscriptionModalMessage,
+    setSubscriptionModalVisible,
+    handleSubscriptionUpgrade,
+  } = useProfileActions(null);
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [chatInfo, setChatInfo] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [subscriptionModalMessageKey, setSubscriptionModalMessageKey] = useState(null);
   const flatListRef = useRef(null);
-  const socketRef = useRef(null);
+  const openingProfileRef = useRef(false);
+  const activeChatIdRef = useRef(null);
   const { onlineUsers, socket } = useSocket();
-  const [subscriptionModalVisible, setSubscriptionModalVisible] =
-    useState(false);
-  const [subscriptionModalMessage, setSubscriptionModalMessage] = useState('');
   const [fullScreenImage, setFullScreenImage] = useState(null);
+
+  const normalizeId = value => {
+    if (!value) return null;
+    if (typeof value === 'object') {
+      if (value._id || value.id) return String(value._id || value.id);
+      if (typeof value.toString === 'function') {
+        const normalized = value.toString();
+        if (normalized && normalized !== '[object Object]') return normalized;
+      }
+      return null;
+    }
+    const normalized = String(value).trim();
+    return normalized || null;
+  };
+
+  const syncNotificationAndUnreadState = useCallback(async () => {
+    if (!chatId || !token) return;
+
+    await dispatch(markMessageNotificationsByChatAsRead(chatId));
+
+    if (notificationId) {
+      await dispatch(markOneNotificationAsRead(notificationId));
+      dispatch(markLocalNotificationAsRead(notificationId));
+    }
+
+    await Promise.all([
+      dispatch(fetchUnreadNotificationCount()),
+      dispatch(fetchUnreadUserNotificationCount()),
+      dispatch(fetchUnreadMessageCount()),
+    ]);
+  }, [chatId, token, notificationId, dispatch]);
 
   const status = chatInfo?._id
     ? onlineUsers?.[chatInfo._id] || {
@@ -61,11 +106,11 @@ const MessageScreen = ({ route, navigation }) => {
   // �o. SOCKET CONNECTION + LISTENERS
   useEffect(() => {
     if (!socket || !chatId) return;
-    socketRef.current = socket;
+    activeChatIdRef.current = normalizeId(chatId);
     socket.emit('joinChat', chatId);
 
     const handleNewMessage = message => {
-      if (message.chat === chatId) {
+      if (normalizeId(message.chat) === activeChatIdRef.current) {
         setMessages(prev => {
           const matchIndex = message.clientId
             ? prev.findIndex(m => m.clientId === message.clientId)
@@ -87,6 +132,7 @@ const MessageScreen = ({ route, navigation }) => {
             chatId,
             userId: user._id,
           });
+          syncNotificationAndUnreadState();
         }
       }
     };
@@ -104,7 +150,7 @@ const MessageScreen = ({ route, navigation }) => {
 
       if (status === 'read' && userId && userId !== user._id) {
         setMessages(prev =>
-          prev.map(m => (m.sender === user._id ? { ...m, status } : m)),
+          prev.map(m => (normalizeId(m.sender) === normalizeId(user._id) ? { ...m, status } : m)),
         );
       }
     };
@@ -116,36 +162,45 @@ const MessageScreen = ({ route, navigation }) => {
       socket.off('newMessage', handleNewMessage);
       socket.off('messageStatusUpdate', handleStatusUpdate);
     };
-  }, [socket, chatId, user?._id]);
+  }, [socket, chatId, user?._id, syncNotificationAndUnreadState]);
 
   // ✅ Emit read event when messages load or update
   useEffect(() => {
-    if (socketRef.current && chatId && user?._id && messages.length > 0) {
-      socketRef.current.emit('readMessagesInChat', {
+    if (socket && chatId && user?._id && messages.length > 0) {
+      socket.emit('readMessagesInChat', {
         chatId,
         userId: user._id,
       });
+      syncNotificationAndUnreadState();
     }
-  }, [chatId, messages.length]);
+  }, [chatId, messages.length, user?._id, syncNotificationAndUnreadState]);
 
   // ✅ Fetch chat info
   useEffect(() => {
+    let cancelled = false;
     const fetchChatInfo = async () => {
       try {
         const { data } = await axios.get(`${API_BASE_URL}/api/chat/${chatId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (data.success && data.chat) {
+        if (!cancelled && data.success && data.chat) {
           const other = data.chat.participants.find(p => p._id !== user._id);
           setChatInfo(other);
         }
-      } catch (err) { }
+      } catch (err) {
+        if (!cancelled) setChatInfo(null);
+      }
     };
     if (token) fetchChatInfo();
+    return () => {
+      cancelled = true;
+    };
   }, [chatId, token]);
 
   // ✅ Fetch messages
   useEffect(() => {
+    let cancelled = false;
+    setMessages([]);
     const fetchMessages = async () => {
       try {
         const res = await axios.get(
@@ -154,12 +209,18 @@ const MessageScreen = ({ route, navigation }) => {
             headers: { Authorization: `Bearer ${token}` },
           },
         );
-        if (res.data.success) {
-          setMessages([...res.data.messages].reverse());
+        if (!cancelled && res.data.success) {
+          // Backend already returns newest-first; keep same order used by socket/optimistic updates.
+          setMessages(Array.isArray(res.data.messages) ? res.data.messages : []);
         }
-      } catch (err) { }
+      } catch (err) {
+        if (!cancelled) setMessages([]);
+      }
     };
     if (token) fetchMessages();
+    return () => {
+      cancelled = true;
+    };
   }, [chatId, token]);
 
   // ✅ Mark messages & notifications read on open
@@ -181,13 +242,7 @@ const MessageScreen = ({ route, navigation }) => {
             headers: { Authorization: `Bearer ${token}` },
           },
         );
-        if (notificationId) {
-          dispatch(markOneNotificationAsRead(notificationId));
-          dispatch(markLocalNotificationAsRead(notificationId));
-          dispatch(fetchUnreadNotificationCount());
-          dispatch(fetchUnreadUserNotificationCount());
-
-        }
+        await syncNotificationAndUnreadState();
       } catch (err) { }
     };
     if (chatId && token) markAsRead();
@@ -204,54 +259,9 @@ const MessageScreen = ({ route, navigation }) => {
         ).catch(err => console.log('Error closing chat:', err));
       }
     };
-  }, [chatId, token, notificationId, dispatch]);
+  }, [chatId, token, notificationId, dispatch, syncNotificationAndUnreadState]);
 
-  // ✅ Initiate Voice/Video Call
-  const initiateCall = async type => {
-    const recipientId = chatInfo?._id;
-    const recipientName = chatInfo?.fullName;
-    if (!recipientId) {
-      Alert.alert('Error', 'Recipient not found.');
-      return;
-    }
-    const feature = type === 'voice_call' ? 'Calling' : 'Video Call';
-    const planFeatures = subscription?.subscription?.plan?.features || [];
-    const hasFeature = planFeatures.some(f =>
-      typeof f === 'string' ? f === feature : f?.name === feature,
-    );
-    if (!hasFeature) {
-      Alert.alert('Upgrade Required', `Please upgrade to use ${feature}.`);
-      return;
-    }
 
-    try {
-      const channelName = generateChannelName(user._id, recipientId);
-      const { data } = await axios.post(
-        `${API_BASE_URL}/api/agora/initiate-call`,
-        { recipientId, callType: type, channelName },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      if (!data.success || !data.message) {
-        Alert.alert('Error', 'Unable to start call.');
-        return;
-      }
-
-      const callMessage = data.message;
-      const screen =
-        type === 'voice_call' ? 'VoiceCallScreen' : 'VideoCallScreen';
-      navigation.navigate(screen, {
-        channelName: callMessage.channelName,
-        token: callMessage.agoraToken,
-        recipientId,
-        recipientName,
-        messageId: callMessage._id,
-        chatId,
-      });
-    } catch (err) {
-      Alert.alert('Error', 'Unable to start call.');
-    }
-  };
 
   // ✅ Image Picker
   const pickImage = async () => {
@@ -265,7 +275,7 @@ const MessageScreen = ({ route, navigation }) => {
       if (!hasPermission) {
         const granted = await PermissionsAndroid.request(permission);
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission required', 'Please allow photo access to send images.');
+          Alert.alert(t('messageScreen.permissionRequired'), t('messageScreen.allowPhotoAccess'));
           return;
         }
       }
@@ -283,12 +293,12 @@ const MessageScreen = ({ route, navigation }) => {
     launchImageLibrary(options, async res => {
       if (res.didCancel) return;
       if (res.errorCode) {
-        Alert.alert('Error', res.errorMessage || 'Unable to open gallery.');
+        Alert.alert(t('messageScreen.error'), res.errorMessage || t('messageScreen.unableToOpenGallery'));
         return;
       }
       const asset = res.assets?.[0];
       if (!asset?.uri) {
-        Alert.alert('Error', 'Unable to select image.');
+        Alert.alert(t('messageScreen.error'), t('messageScreen.unableToSelectImage'));
         return;
       }
       await sendMessage(null, asset);
@@ -303,7 +313,10 @@ const MessageScreen = ({ route, navigation }) => {
   };
 
   const sendMessage = async (textMessage, imageAsset = null) => {
-    const text = textMessage || inputText.trim();
+    const text =
+      typeof textMessage === 'string'
+        ? textMessage.trim()
+        : inputText.trim();
     if (!text && !imageAsset) return;
 
     const clientId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -325,30 +338,40 @@ const MessageScreen = ({ route, navigation }) => {
     setInputText('');
     scrollToBottom();
 
-    const formData = new FormData();
-    if (text) formData.append('text', text);
-    formData.append('clientId', clientId);
-    if (imageAsset) {
-      formData.append('image', {
-        uri: imageAsset.uri,
-        type: imageAsset.type || 'image/jpeg',
-        name: imageAsset.fileName || `photo_${Date.now()}.jpg`,
-      });
-    }
-
     if (imageAsset) setUploading(true);
 
     try {
-      const res = await axios.post(
-        `${API_BASE_URL}/api/chat/${chatId}/send`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
+      let res;
+      if (imageAsset) {
+        const formData = new FormData();
+        if (text) formData.append('text', text);
+        formData.append('clientId', clientId);
+        formData.append('image', {
+          uri: imageAsset.uri,
+          type: imageAsset.type || 'image/jpeg',
+          name: imageAsset.fileName || `photo_${Date.now()}.jpg`,
+        });
+
+        res = await axios.post(
+          `${API_BASE_URL}/api/chat/${chatId}/send`,
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           },
-        },
-      );
+        );
+      } else {
+        res = await axios.post(
+          `${API_BASE_URL}/api/chat/${chatId}/send`,
+          { text, clientId },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+      }
 
       const data = res.data;
 
@@ -367,7 +390,12 @@ const MessageScreen = ({ route, navigation }) => {
         data.code === 'LIMIT_REACHED'
       ) {
         setMessages(prev => prev.filter(m => m.clientId !== clientId));
-        setSubscriptionModalMessage(data.message);
+        setSubscriptionModalMessage(null);
+        setSubscriptionModalMessageKey(
+          data.code === 'IMAGE_PREMIUM_REQUIRED'
+            ? 'subscriptionModel.image_premium_required'
+            : 'subscriptionModel.message_limit_reached',
+        );
         setSubscriptionModalVisible(true);
         return;
       }
@@ -378,13 +406,14 @@ const MessageScreen = ({ route, navigation }) => {
         /(subscribe|subscription|premium|plan|upgrade)/i.test(data.message)
       ) {
         setMessages(prev => prev.filter(m => m.clientId !== clientId));
-        setSubscriptionModalMessage(data.message);
+        setSubscriptionModalMessage(null);
+        setSubscriptionModalMessageKey('subscriptionModel.message_limit_reached');
         setSubscriptionModalVisible(true);
         return;
       }
 
       setMessages(prev => prev.filter(m => m.clientId !== clientId));
-      Alert.alert('Notice', data.message || 'Unable to send message.');
+      Alert.alert(t('messageScreen.notice'), t('messageScreen.unableToSendMessage'));
     } catch (error) {
       const res = error?.response?.data || {};
 
@@ -394,7 +423,12 @@ const MessageScreen = ({ route, navigation }) => {
 
       if (code === 'IMAGE_PREMIUM_REQUIRED' || code === 'LIMIT_REACHED') {
         setMessages(prev => prev.filter(m => m.clientId !== clientId));
-        setSubscriptionModalMessage(msg);
+        setSubscriptionModalMessage(null);
+        setSubscriptionModalMessageKey(
+          code === 'IMAGE_PREMIUM_REQUIRED'
+            ? 'subscriptionModel.image_premium_required'
+            : 'subscriptionModel.message_limit_reached',
+        );
         setSubscriptionModalVisible(true);
         return;
       }
@@ -402,14 +436,15 @@ const MessageScreen = ({ route, navigation }) => {
       // ✅ flexible fallback for any plan-related messages
       if (/(subscribe|subscription|premium|plan|upgrade)/i.test(msg)) {
         setMessages(prev => prev.filter(m => m.clientId !== clientId));
-        setSubscriptionModalMessage(msg);
+        setSubscriptionModalMessage(null);
+        setSubscriptionModalMessageKey('subscriptionModel.message_limit_reached');
         setSubscriptionModalVisible(true);
         return;
       }
 
       // fallback for non-subscription issues
       setMessages(prev => prev.filter(m => m.clientId !== clientId));
-      Alert.alert('Error', msg);
+      Alert.alert(t('messageScreen.error'), msg);
     } finally {
       setUploading(false);
     }
@@ -426,7 +461,7 @@ const MessageScreen = ({ route, navigation }) => {
 
   // ✅ Render messages
   const renderMessage = useCallback(({ item }) => {
-    const isMine = item.sender === user._id;
+    const isMine = normalizeId(item.sender) === normalizeId(user._id);
     if (item.type === 'voice_call' || item.type === 'video_call') {
       const icon =
         item.type === 'voice_call' ? 'call-outline' : 'videocam-outline';
@@ -493,7 +528,39 @@ const MessageScreen = ({ route, navigation }) => {
     );
   }, [user?._id]);
 
-  const keyExtractor = useCallback(item => item._id || item.clientId, []);
+  const keyExtractor = useCallback(
+    item => String(item?._id || item?.clientId || `${item?.createdAt || Date.now()}`),
+    [],
+  );
+
+  const openProfileWithGate = useCallback(
+    async (profile) => {
+      const profileId = profile?._id;
+      if (!profileId || !token) return;
+      if (openingProfileRef.current) return;
+
+      openingProfileRef.current = true;
+      try {
+        const { data } = await axios.post(
+          `${API_BASE_URL}/api/user/view/${profileId}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+
+        if (data?.success) {
+          navigation.navigate('ProfileDetailScreen', {
+            profileId,
+            item: profile,
+          });
+        }
+      } catch (err) {
+        Alert.alert(t('messageScreen.notice'), t('messageScreen.unableToOpenProfile'));
+      } finally {
+        openingProfileRef.current = false;
+      }
+    },
+    [navigation, token],
+  );
 
   const renderHeader = () => (
     <View style={styles.headerContainer}>
@@ -505,12 +572,7 @@ const MessageScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.headerUserInfo}
           activeOpacity={0.8}
-          onPress={() =>
-            navigation.navigate('ProfileDetailScreen', {
-              profileId: chatInfo?._id,
-              item: chatInfo,
-            })
-          }
+          onPress={() => openProfileById(chatInfo)}
         >
           <Image
             source={
@@ -524,7 +586,7 @@ const MessageScreen = ({ route, navigation }) => {
           />
           <View>
             <Text style={styles.headerName}>
-              {chatInfo?.fullName || 'User'}
+              {chatInfo?.fullName || t('messageScreen.user')}
             </Text>
             <UserStatus
               isOnline={status?.status === 'online'}
@@ -535,20 +597,6 @@ const MessageScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       )}
 
-      <View style={styles.callButtonsContainer}>
-        <TouchableOpacity
-          onPress={() => initiateCall('video_call')}
-          style={styles.callButtonHeader}
-        >
-          <Icon name="videocam-outline" size={26} color="#111827" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => initiateCall('voice_call')}
-          style={styles.callButtonHeader}
-        >
-          <Icon name="call-outline" size={24} color="#111827" />
-        </TouchableOpacity>
-      </View>
     </View>
   );
 
@@ -585,7 +633,7 @@ const MessageScreen = ({ route, navigation }) => {
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.textInput}
-              placeholder="Text here"
+              placeholder={t('messageScreen.textHere')}
               placeholderTextColor="#9ca3af"
               value={inputText}
               onChangeText={setInputText}
@@ -607,9 +655,13 @@ const MessageScreen = ({ route, navigation }) => {
         </View>
         <SubscriptionModal
           visible={subscriptionModalVisible}
-          message={subscriptionModalMessage}
-          onUpgradePress={handleSubscription}
-          onClose={() => setSubscriptionModalVisible(false)}
+          message={typeof subscriptionModalMessage === 'string' ? subscriptionModalMessage : null}
+          messageKey={subscriptionModalMessageKey}
+          onUpgradePress={handleSubscriptionUpgrade}
+          onClose={() => {
+            setSubscriptionModalVisible(false);
+            setSubscriptionModalMessageKey(null);
+          }}
         />
         <ImageView
           images={[{ uri: fullScreenImage }]}

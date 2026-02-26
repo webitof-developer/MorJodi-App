@@ -42,6 +42,16 @@ const REGISTER_DRAFT_KEY = 'register_draft_v1';
 
 const ABOUT_ME_MAX = 500;
 const ABOUT_ME_MIN = 50;
+const MAX_UPLOAD_SIZE_MB = 5;
+const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+];
 
 const PROFILE_FOR_OPTIONS = [
   { value: 'self', name: 'Self' },
@@ -116,7 +126,8 @@ const CustomPicker = ({
   disabled = false,
   disabledMessage,
   onDisabledPress,
-  multiSelect = false
+  multiSelect = false,
+  allowDeselectSingle = false,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -154,7 +165,7 @@ const CustomPicker = ({
       if (onDisabledPress) {
         onDisabledPress();
       } else if (disabledMessage) {
-        Alert.alert("Notice", disabledMessage);
+        Alert.alert(i18n.t('common.notice'), disabledMessage);
       }
       return;
     }
@@ -234,6 +245,7 @@ const CustomPicker = ({
           searchable={searchable}
           onRequestAdd={onRequestAdd}
           multiSelect={multiSelect}
+          allowDeselectSingle={allowDeselectSingle && !multiSelect}
         />
       )}
     </>
@@ -323,8 +335,9 @@ const RegisterScreen = ({ navigation }) => {
   const [aadharBack, setAadharBack] = useState(null);
   const [panFront, setPanFront] = useState(null);
   const [panBack, setPanBack] = useState(null);
-  // Unify photos: Index 0 is Main DP, 1-5 are Gallery
-  const [profilePhotos, setProfilePhotos] = useState(Array(6).fill(null));
+  const [profileImage, setProfileImage] = useState(null);
+  const [featurePhotos, setFeaturePhotos] = useState(Array(6).fill(null));
+  const [imageMetaByUri, setImageMetaByUri] = useState({});
   const [referralCode, setReferralCode] = useState('');
 
   // Page 5 - Complex Object Fields (Family, Lifestyle, Privacy)
@@ -425,9 +438,25 @@ const RegisterScreen = ({ navigation }) => {
   const phoneDigits = phoneNumber.replace(/[^0-9]/g, '');
   const isValidEmail = text =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((text || '').trim());
+  const getAboutMeValidationMessage = text => {
+    const trimmed = (text || '').trim();
+    if (!trimmed) return i18n.t('register.validationtext.aboutMeRequired');
+    if (trimmed.length < ABOUT_ME_MIN) {
+      return i18n.t('register.validationtext.aboutMeMin', { min: ABOUT_ME_MIN });
+    }
+    if (!/[A-Za-z\u00C0-\u024F\u0900-\u097F]/.test(trimmed)) {
+      return i18n.t('register.validationtext.aboutMeLetters');
+    }
+    if (trimmed.split(/\s+/).filter(Boolean).length < 5) {
+      return i18n.t('register.validationtext.aboutMeWords', { min: 5 });
+    }
+    return '';
+  };
   const phoneError = errors.page1 && loginType === 'phone' && phoneDigits.length < 10;
   const emailError = errors.page1 && loginType === 'email' && !isValidEmail(email);
   const fullNameError = errors.page1 && !fullName;
+  const aboutMeErrorMessage = getAboutMeValidationMessage(aboutMe);
+  const aboutMeError = errors.page6 && !!aboutMeErrorMessage;
 
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [errorMeta, setErrorMeta] = useState(null);
@@ -473,7 +502,10 @@ const RegisterScreen = ({ navigation }) => {
         panFront,
         panBack,
 
-        profilePhotos, // Unified array
+        profileImage,
+        featurePhotos,
+        // Keep legacy draft shape for backward compatibility.
+        profilePhotos: [profileImage, ...featurePhotos],
         referralCode,
         fatherStatus,
         motherStatus,
@@ -527,22 +559,21 @@ const RegisterScreen = ({ navigation }) => {
       if (draft.panFront) setPanFront(draft.panFront);
       if (draft.panBack) setPanBack(draft.panBack);
 
-      // Unified Photos Migration Logic
-      if (draft.profilePhotos && Array.isArray(draft.profilePhotos)) {
-        // If coming from old draft with profileImage separate
-        let photos = [...draft.profilePhotos];
-        // Ensure size 6
+      // Photo draft migration: support both new and legacy shapes.
+      if (draft.profileImage) {
+        setProfileImage(draft.profileImage);
+      }
+      if (draft.featurePhotos && Array.isArray(draft.featurePhotos)) {
+        const photos = [...draft.featurePhotos];
         while (photos.length < 6) photos.push(null);
-
-        if (draft.profileImage && !photos[0]) {
-          photos[0] = draft.profileImage;
+        setFeaturePhotos(photos.slice(0, 6));
+      } else if (draft.profilePhotos && Array.isArray(draft.profilePhotos)) {
+        const photos = [...draft.profilePhotos];
+        while (photos.length < 7) photos.push(null);
+        if (!draft.profileImage && photos[0]) {
+          setProfileImage(photos[0]);
         }
-        setProfilePhotos(photos);
-      } else if (draft.profileImage) {
-        // Only profileImage exists
-        const photos = Array(6).fill(null);
-        photos[0] = draft.profileImage;
-        setProfilePhotos(photos);
+        setFeaturePhotos(photos.slice(1, 7));
       }
 
       if (draft.referralCode) setReferralCode(draft.referralCode);
@@ -570,12 +601,17 @@ const RegisterScreen = ({ navigation }) => {
   const showAlert = (title, message) =>
     setAlertState({ visible: true, title, message });
   const hideAlert = () => setAlertState(prev => ({ ...prev, visible: false }));
+  const buildRequiredDetailsMessage = missingFields =>
+    i18n.t('register.validationtext.requiredDetails', {
+      fields: missingFields.join(', '),
+    });
 
   useEffect(() => {
     const fetchMetaData = async () => {
       try {
         const profileMetaResponse = await axios.get(
           `${META_API_BASE_URL}/profile-meta`,
+          { suppressGlobalError: true }
         );
         // console.log(`profileMetaResponse`, profileMetaResponse.data)
         setAllMetaData(profileMetaResponse.data);
@@ -593,15 +629,18 @@ const RegisterScreen = ({ navigation }) => {
   useEffect(() => {
     // Auto-save when images change
     saveDraft();
-  }, [profilePhotos]);
+  }, [profileImage, featurePhotos]);
 
-  // Resolve Gotra ID to Name
+  // Normalize gotra to ID so picker can show selected option reliably
   useEffect(() => {
     if (gotra && allMetaData.gotras && allMetaData.gotras.length > 0) {
-      if (/^[0-9a-fA-F]{24}$/.test(gotra)) {
-        const found = allMetaData.gotras.find(g => g._id === gotra);
-        if (found) {
-          setGotra(found.name);
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(gotra);
+      if (!isObjectId) {
+        const found = allMetaData.gotras.find(
+          g => (g.name || '').trim().toLowerCase() === gotra.trim().toLowerCase()
+        );
+        if (found?._id) {
+          setGotra(found._id);
         }
       }
     }
@@ -626,19 +665,100 @@ const RegisterScreen = ({ navigation }) => {
       setShowGotraSuggestions(false);
     }
   };
+  const getImageValidationMessage = (asset) => {
+    if (!asset) return i18n.t('register.validationtext.imagePickFailed');
+    if (asset.type && !ALLOWED_IMAGE_MIME_TYPES.includes(asset.type)) {
+      return i18n.t('register.validationtext.invalidImageType');
+    }
+    if (asset.fileSize && asset.fileSize > MAX_UPLOAD_SIZE_BYTES) {
+      return i18n.t('register.validationtext.imageTooLarge', {
+        size: MAX_UPLOAD_SIZE_MB,
+      });
+    }
+    if (!asset.uri) {
+      return i18n.t('register.validationtext.imagePickFailed');
+    }
+    return '';
+  };
+
+  const getAssetSizeBytes = async (asset) => {
+    if (!asset) return 0;
+    if (Number(asset.fileSize) > 0) return Number(asset.fileSize);
+    if (!asset.uri) return 0;
+
+    try {
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      return Number(blob?.size || 0);
+    } catch (e) {
+      return 0;
+    }
+  };
+
+  const rememberImageMeta = (asset) => {
+    if (!asset?.uri) return;
+    setImageMetaByUri(prev => ({
+      ...prev,
+      [asset.uri]: {
+        fileSize: Number(asset.fileSize || 0),
+        type: asset.type || '',
+      },
+    }));
+  };
+
+  const hasOversizeSelectedImages = () => {
+    const selectedUris = [
+      profileImage,
+      aadharFront,
+      aadharBack,
+      panFront,
+      panBack,
+      ...(Array.isArray(featurePhotos) ? featurePhotos : []),
+    ].filter(Boolean);
+
+    return selectedUris.some((uri) => {
+      const meta = imageMetaByUri[uri];
+      return meta?.fileSize > MAX_UPLOAD_SIZE_BYTES;
+    });
+  };
+
   const pickPhoto = async (setter, multiple = false, targetIndex = -1) => {
     try {
       const result = await launchImageLibrary({
         mediaType: 'photo',
         selectionLimit: (multiple && targetIndex === -1) ? 6 : 1,
-        quality: 0.8
+        quality: 1,
+        includeExtra: true,
       });
+      if (result.didCancel) return;
+      if (result.errorCode) {
+        showAlert(i18n.t('register.validation'), i18n.t('register.validationtext.imagePickFailed'));
+        return;
+      }
       if (result.assets && result.assets.length > 0) {
+        const validAssets = [];
+        for (const asset of result.assets) {
+          const resolvedSize = await getAssetSizeBytes(asset);
+          const validatedAsset = {
+            ...asset,
+            fileSize: resolvedSize || asset.fileSize,
+          };
+          const imageValidationMessage = getImageValidationMessage(validatedAsset);
+          if (imageValidationMessage) {
+            showAlert(i18n.t('register.validation'), imageValidationMessage);
+            continue;
+          }
+          rememberImageMeta(validatedAsset);
+          validAssets.push(validatedAsset);
+        }
+        if (validAssets.length === 0) return;
+
         if (multiple) {
           setter(prev => {
-            const copy = Array.isArray(prev) ? [...prev] : Array(6).fill(null);
-            while (copy.length < 6) copy.push(null);
-            const uris = result.assets.map(a => a.uri);
+            const copy = Array.isArray(prev) ? [...prev] : [];
+            const minSlots = Array.isArray(prev) ? prev.length : (targetIndex + 1);
+            while (copy.length < Math.max(1, minSlots)) copy.push(null);
+            const uris = validAssets.map(a => a.uri);
 
             if (targetIndex !== -1) {
               // Targeted update: strict assignment to specific slot
@@ -646,7 +766,7 @@ const RegisterScreen = ({ navigation }) => {
             } else {
               // Fill empty slots (fallback or generic add)
               let uriIndex = 0;
-              for (let i = 0; i < 6 && uriIndex < uris.length; i++) {
+              for (let i = 0; i < copy.length && uriIndex < uris.length; i++) {
                 if (!copy[i]) {
                   copy[i] = uris[uriIndex];
                   uriIndex++;
@@ -658,15 +778,15 @@ const RegisterScreen = ({ navigation }) => {
         } else {
           // Single setter (legacy) - used for ID cards
           if (typeof setter === 'function') {
-            setter(result.assets[0].uri);
+            setter(validAssets[0].uri);
           }
         }
       }
     } catch (e) { }
   };
 
-  const removePhoto = (index) => {
-    setProfilePhotos(prev => {
+  const removeFeaturePhoto = (index) => {
+    setFeaturePhotos(prev => {
       const newP = [...prev];
       newP[index] = null;
       return newP;
@@ -729,20 +849,20 @@ const RegisterScreen = ({ navigation }) => {
         name,
         parentType,
         parentId
-      }, config);
+      }, { ...config, suppressGlobalError: true });
       if (res.data.success) {
         setSuccessPopup({
           visible: true,
-          title: "Request Submitted",
-          message: `Your request to add ${type} "${name}" has been submitted. It will appear in the list after admin approval.`,
+          title: i18n.t('register.dataRequest.submittedTitle'),
+          message: i18n.t('register.dataRequest.submittedMessage', { type, name }),
           type: 'success'
         });
       }
     } catch (err) {
-      const msg = err.response?.data?.message || "Request failed";
+      const msg = err.response?.data?.message || i18n.t('register.dataRequest.failedMessage');
       setSuccessPopup({
         visible: true,
-        title: "Error",
+        title: i18n.t('register.error'),
         message: msg,
         type: 'error'
       });
@@ -757,28 +877,26 @@ const RegisterScreen = ({ navigation }) => {
       );
       return;
     }
-    if (!aboutMe || aboutMe.trim().length < ABOUT_ME_MIN) {
+    const aboutMeValidationMessage = getAboutMeValidationMessage(aboutMe);
+    if (aboutMeValidationMessage) {
       showAlert(
         i18n.t('register.validation'),
-        i18n.t('register.validationtext.aboutMeMin', { min: ABOUT_ME_MIN })
+        aboutMeValidationMessage
       );
       return; // ⛔ STOP SUBMIT
     }
+    if (hasOversizeSelectedImages()) {
+      showAlert(
+        i18n.t('register.validation'),
+        i18n.t('register.validationtext.imageTooLarge', { size: MAX_UPLOAD_SIZE_MB })
+      );
+      return;
+    }
     try {
-      // OPTIMISTIC NAVIGATION: Navigate immediately for "Instant" feel
-      navigation.navigate('OtpVerify', {
-        email: loginType === 'email' ? email : undefined,
-        phoneNumber: loginType === 'phone' ? phoneNumber : undefined,
-        type: 'register',
-        otpExpires: Date.now() + 5 * 60 * 1000,
-      });
-
-      // Defer payload creation to allow navigation transition to start smoothly
-      setTimeout(async () => {
-        try {
-          setLoading(true);
-          await saveDraft(currentPage);
-          const formData = new FormData();
+      try {
+        setLoading(true);
+        await saveDraft(currentPage);
+        const formData = new FormData();
 
           // Page 1
           if (loginType === 'email') {
@@ -851,10 +969,10 @@ const RegisterScreen = ({ navigation }) => {
           );
 
           // Image uploads
-          // Main DP is index 0
-          if (profilePhotos[0]) {
+          const mainPhotoUri = profileImage ? (typeof profileImage === 'string' ? profileImage : profileImage.uri) : null;
+          if (mainPhotoUri) {
             formData.append('image', {
-              uri: profilePhotos[0],
+              uri: mainPhotoUri,
               name: 'profile_dp.jpg',
               type: 'image/jpeg',
             });
@@ -890,8 +1008,8 @@ const RegisterScreen = ({ navigation }) => {
             });
           }
 
-          // Gallery photos (Index 1 to 5)
-          const galleryPhotos = profilePhotos.slice(1).filter(p => p !== null);
+          // Feature/Card photos
+          const galleryPhotos = featurePhotos.filter(p => p !== null);
           galleryPhotos.forEach((photoUri, index) => {
             if (photoUri) {
               formData.append('photos', {
@@ -902,37 +1020,37 @@ const RegisterScreen = ({ navigation }) => {
             }
           });
 
-          // console.log('Sending Registration Data:', formData);
-
-          const response = await axios.post(
-            `${API_URL}/register/request-otp`,
-            formData,
-            {
-              headers: {
-                'Content-Type': 'multipart/form-data',
-              },
+        const response = await axios.post(
+          `${API_URL}/register/request-otp`,
+          formData,
+          {
+            suppressGlobalError: true,
+            headers: {
+              'Content-Type': 'multipart/form-data',
             },
-          );
+          },
+        );
 
-          // Alert.alert('Success', response.data.message);
-          // Alert.alert('Success', response.data.message);
-          // Navigation already happened optimistically
-
-        } catch (error) {
-          console.log('Registration Error:', error);
-
-          // If failed, go back from OTP screen so user can retry
-          navigation.goBack();
-
-          const errorMessage = error.response?.data?.message || error.message || i18n.t('register.registerFailed');
-          showAlert(
-            i18n.t('register.error'),
-            errorMessage,
-          );
-        } finally {
-          setLoading(false);
+        navigation.navigate('OtpVerify', {
+          email: loginType === 'email' ? email : undefined,
+          phoneNumber: loginType === 'phone' ? phoneNumber : undefined,
+          type: 'register',
+          otpExpires: response?.data?.otpExpires || Date.now() + 5 * 60 * 1000,
+        });
+      } catch (error) {
+        const status = error?.response?.status;
+        const errorCode = error?.response?.data?.code;
+        let errorMessage = error?.response?.data?.message || i18n.t('register.registerFailed');
+        if (errorCode === 'FILE_TOO_LARGE') {
+          errorMessage = i18n.t('register.validationtext.imageTooLarge', { size: MAX_UPLOAD_SIZE_MB });
         }
-      }, 50);
+        if (!status || status >= 500) {
+          errorMessage = i18n.t('register.validationtext.serverIssue');
+        }
+        showAlert(i18n.t('register.error'), errorMessage);
+      } finally {
+        setLoading(false);
+      }
     } catch (e) {
       console.log('Registration Setup Error:', e);
       setLoading(false);
@@ -947,23 +1065,23 @@ const RegisterScreen = ({ navigation }) => {
       if (!fullName) missingFields.push(i18n.t('register.labels.fullName'));
 
       if (!loginType) {
-        missingFields.push("Email or Phone Login Method");
+        missingFields.push(i18n.t('register.validationtext.emailOrPhoneMethod'));
       } else {
         if (loginType === 'email') {
           if (!email) missingFields.push(i18n.t('register.labels.email'));
-          else if (!isValidEmail(email)) missingFields.push("Valid Email");
+          else if (!isValidEmail(email)) missingFields.push(i18n.t('register.validationtext.validEmail'));
         }
         if (loginType === 'phone') {
           const digits = phoneNumber.replace(/[^0-9]/g, '');
           if (!phoneNumber) missingFields.push(i18n.t('auth.phone'));
-          else if (digits.length < 10) missingFields.push("Valid Phone Number (10 digits)");
+          else if (digits.length < 10) missingFields.push(i18n.t('register.validationtext.validPhone'));
         }
       }
 
       if (missingFields.length > 0) {
         showAlert(
           i18n.t('register.validation'),
-          `Please fill the following required details:\n\n${missingFields.join(', ')}`
+          buildRequiredDetailsMessage(missingFields)
         );
         setErrors(prev => ({ ...prev, page1: true }));
         return;
@@ -988,7 +1106,7 @@ const RegisterScreen = ({ navigation }) => {
       if (missingFields.length > 0) {
         showAlert(
           i18n.t('register.validation'),
-          `Please fill the following required details:\n\n${missingFields.join(', ')}`
+          buildRequiredDetailsMessage(missingFields)
         );
         setErrors(prev => ({ ...prev, page2: true }));
         return;
@@ -1024,7 +1142,7 @@ const RegisterScreen = ({ navigation }) => {
       if (missingFields.length > 0) {
         showAlert(
           i18n.t('register.validation'),
-          `Please fill the following required details:\n\n${missingFields.join(', ')}`
+          buildRequiredDetailsMessage(missingFields)
         );
         setErrors(prev => ({ ...prev, page3: true }));
         return;
@@ -1035,20 +1153,21 @@ const RegisterScreen = ({ navigation }) => {
     // // --- Page 4 Validation ---
     else if (currentPage === 4) {
       // Main Profile (Index 0)
-      if (!profilePhotos[0]) {
+      const mainPhotoUri = profileImage ? (typeof profileImage === 'string' ? profileImage : profileImage.uri) : null;
+      if (!mainPhotoUri) {
         showAlert(
           i18n.t('register.validation'),
-          "Please upload a main profile display picture."
+          i18n.t('register.validationtext.mainPhotoRequired')
         );
         return;
       }
 
       // Total Photos Count
-      const validPhotosCount = profilePhotos.filter(p => p !== null).length;
+      const validPhotosCount = (mainPhotoUri ? 1 : 0) + featurePhotos.filter(p => p !== null).length;
       if (validPhotosCount < 3) {
         showAlert(
           i18n.t('register.validation'),
-          "Please upload at least 3 photos (1 Main + 2 Gallery)."
+          i18n.t('register.validationtext.minPhotosRequired')
         );
         return;
       }
@@ -1059,7 +1178,7 @@ const RegisterScreen = ({ navigation }) => {
       if (!aadharFront || !aadharBack) {
         showAlert(
           i18n.t('register.validation'),
-          "Please upload both front and back sides of Aadhar Card."
+          i18n.t('register.validationtext.aadharRequired')
         );
         return;
       }
@@ -1075,17 +1194,25 @@ const RegisterScreen = ({ navigation }) => {
       if (!familyValues) missingFields.push(i18n.t('register.labels.familyValues'));
       if (!diet) missingFields.push(i18n.t('register.labels.diet'));
       if (!annualIncome) missingFields.push(i18n.t('register.labels.income'));
-      if (!aboutMe) missingFields.push(i18n.t('register.labels.about'));
 
       if (missingFields.length > 0) {
         showAlert(
           i18n.t('register.validation'),
-          `Please fill the following required details:\n\n${missingFields.join(', ')}`
+          buildRequiredDetailsMessage(missingFields)
         );
         setErrors(prev => ({ ...prev, page6: true }));
         return;
       }
       setErrors(prev => ({ ...prev, page6: false }));
+
+      if (aboutMeErrorMessage) {
+        showAlert(
+          i18n.t('register.validation'),
+          aboutMeErrorMessage
+        );
+        setErrors(prev => ({ ...prev, page6: true }));
+        return;
+      }
 
       handleRegister();
       return;
@@ -1489,8 +1616,8 @@ const RegisterScreen = ({ navigation }) => {
             disabled={!selectedReligion}
             onDisabledPress={() => setSuccessPopup({
               visible: true,
-              title: "Attention",
-              message: "Please select a Religion first.",
+              title: i18n.t('register.attention'),
+              message: i18n.t('register.validationtext.selectReligionFirst'),
               type: 'info'
             })}
           />
@@ -1509,8 +1636,8 @@ const RegisterScreen = ({ navigation }) => {
             disabled={!selectedCaste}
             onDisabledPress={() => setSuccessPopup({
               visible: true,
-              title: "Attention",
-              message: "Please select a Caste first.",
+              title: i18n.t('register.attention'),
+              message: i18n.t('register.validationtext.selectCasteFirst'),
               type: 'info'
             })}
           />
@@ -1528,8 +1655,8 @@ const RegisterScreen = ({ navigation }) => {
             disabled={!selectedSubCaste}
             onDisabledPress={() => setSuccessPopup({
               visible: true,
-              title: "Attention",
-              message: "Please select a SubCaste first.",
+              title: i18n.t('register.attention'),
+              message: i18n.t('register.validationtext.selectSubCasteFirst'),
               type: 'info'
             })}
           />
@@ -1610,18 +1737,78 @@ const RegisterScreen = ({ navigation }) => {
     </ScrollView>
   );
 
-  const renderPage4 = () => (
+  const renderPage4 = () => {
+    const mainProfilePhotoUri = profileImage ? (typeof profileImage === 'string' ? profileImage : profileImage.uri) : null;
+    return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
 
 
-      {/* 1. Gallery Profile Photos (Remaining) */}
       <View style={{ marginVertical: 10 }}>
         <Text style={[styles.authTitle, { fontSize: 18, marginBottom: 2 }]}>
-          {i18n.t('register.labels.profilePhotos')} <Text style={{ color: COLORS.primary }}>*</Text>
+          {i18n.t('register.photoSection.mainProfile')} <Text style={{ color: COLORS.primary }}>*</Text>
+        </Text>
+        <Text style={[styles.authSubtitle, { fontSize: 13, marginBottom: 12 }]}>
+          {i18n.t('register.validationtext.mainPhotoRequired')}
+        </Text>
+        <Text style={[styles.authSubtitle, { fontSize: 12, marginBottom: 12 }]}>
+          {i18n.t('register.photoSection.imageSizeHint', { size: MAX_UPLOAD_SIZE_MB })}
+        </Text>
+
+        <View style={{
+          width: '31%',
+          aspectRatio: 1,
+          borderRadius: 8,
+          overflow: 'hidden',
+          backgroundColor: '#F5F5F5'
+        }}>
+          {mainProfilePhotoUri ? (
+            <View style={{ flex: 1 }}>
+              <Image
+                source={{ uri: mainProfilePhotoUri }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+              <TouchableOpacity
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  backgroundColor: 'rgba(0,0,0,0.6)',
+                  borderRadius: 12
+                }}
+                onPress={() => setProfileImage(null)}
+              >
+                <Icon name="close" size={16} color={COLORS.white} style={{ margin: 2 }} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={{
+                width: '100%',
+                height: '100%',
+                borderWidth: 1,
+                borderColor: COLORS.gray,
+                borderStyle: 'dashed',
+                borderRadius: 8,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              onPress={() => pickPhoto(setProfileImage)}
+            >
+              <Icon name="add" size={30} color={COLORS.gray} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* 2. Dating Card Photos */}
+      <View style={{ marginVertical: 10 }}>
+        <Text style={[styles.authTitle, { fontSize: 18, marginBottom: 2 }]}>
+          {i18n.t('register.labels.datingCardPhoto')} <Text style={{ color: COLORS.primary }}>*</Text>
         </Text>
         <Text style={[styles.authSubtitle, { fontSize: 13, marginBottom: 15 }]}>
-          Required minimum 3 images with clear face.
+          {i18n.t('register.photoSection.requiredMin')}
         </Text>
 
         <View style={{
@@ -1631,7 +1818,7 @@ const RegisterScreen = ({ navigation }) => {
         }}>
 
           {[...Array(6)].map((_, index) => {
-            const photo = profilePhotos[index];
+            const photo = featurePhotos[index];
             const photoUri = photo ? (typeof photo === 'string' ? photo : photo.uri) : null;
 
             return (
@@ -1658,7 +1845,7 @@ const RegisterScreen = ({ navigation }) => {
                         backgroundColor: 'rgba(0,0,0,0.6)',
                         borderRadius: 12
                       }}
-                      onPress={() => removePhoto(index)}
+                      onPress={() => removeFeaturePhoto(index)}
                     >
                       <Icon name="close" size={16} color={COLORS.white} style={{ margin: 2 }} />
                     </TouchableOpacity>
@@ -1671,7 +1858,9 @@ const RegisterScreen = ({ navigation }) => {
                         paddingVertical: 2,
                         alignItems: 'center'
                       }}>
-                        <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>Main Profile</Text>
+                        <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
+                          {i18n.t('register.photoSection.mainImage')}
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -1687,7 +1876,7 @@ const RegisterScreen = ({ navigation }) => {
                       justifyContent: 'center',
                       alignItems: 'center',
                     }}
-                    onPress={() => pickPhoto(setProfilePhotos, true, index)} // Call specific index
+                    onPress={() => pickPhoto(setFeaturePhotos, true, index)}
                   >
                     <Icon name="add" size={30} color={COLORS.gray} />
                   </TouchableOpacity>
@@ -1697,7 +1886,7 @@ const RegisterScreen = ({ navigation }) => {
           })}
         </View>
         <Text style={{ fontSize: 12, color: COLORS.gray, marginTop: 5, textAlign: 'right' }}>
-          Max 6 photos / Min 3 photos
+          {i18n.t('register.photoSection.maxMin')}
         </Text>
 
         {/* TIPS SECTION */}
@@ -1705,11 +1894,11 @@ const RegisterScreen = ({ navigation }) => {
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
             <Icon name="bulb-outline" size={20} color={COLORS.primary} style={{ marginRight: 8 }} />
             <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.black }}>
-              Here are a few tips
+              {i18n.t('register.photoSection.tipsTitle')}
             </Text>
           </View>
           <Text style={{ fontSize: 12, color: COLORS.gray, textAlign: 'center', marginBottom: 20 }}>
-            Avoid the following photos to highlight your profile better
+            {i18n.t('register.photoSection.tipsSubtitle')}
           </Text>
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
@@ -1724,7 +1913,7 @@ const RegisterScreen = ({ navigation }) => {
                   <Icon name="close" size={10} color="#FFF" />
                 </View>
               </View>
-              <Text style={{ fontSize: 11, color: COLORS.gray, textAlign: 'center' }}>Blur photo</Text>
+              <Text style={{ fontSize: 11, color: COLORS.gray, textAlign: 'center' }}>{i18n.t('register.photoSection.blurPhoto')}</Text>
             </View>
 
             {/* 2. Side */}
@@ -1738,7 +1927,7 @@ const RegisterScreen = ({ navigation }) => {
                   <Icon name="close" size={10} color="#FFF" />
                 </View>
               </View>
-              <Text style={{ fontSize: 11, color: COLORS.gray, textAlign: 'center' }}>Side face</Text>
+              <Text style={{ fontSize: 11, color: COLORS.gray, textAlign: 'center' }}>{i18n.t('register.photoSection.sideFace')}</Text>
             </View>
 
             {/* 3. Watermark */}
@@ -1752,7 +1941,7 @@ const RegisterScreen = ({ navigation }) => {
                   <Icon name="close" size={10} color="#FFF" />
                 </View>
               </View>
-              <Text style={{ fontSize: 11, color: COLORS.gray, textAlign: 'center' }}>Watermark</Text>
+              <Text style={{ fontSize: 11, color: COLORS.gray, textAlign: 'center' }}>{i18n.t('register.photoSection.watermark')}</Text>
             </View>
 
             {/* 4. Group */}
@@ -1766,12 +1955,12 @@ const RegisterScreen = ({ navigation }) => {
                   <Icon name="close" size={10} color="#FFF" />
                 </View>
               </View>
-              <Text style={{ fontSize: 11, color: COLORS.gray, textAlign: 'center' }}>Group pic</Text>
+              <Text style={{ fontSize: 11, color: COLORS.gray, textAlign: 'center' }}>{i18n.t('register.groupPic')}</Text>
             </View>
           </View>
 
           <Text style={{ marginTop: 25, fontSize: 12, color: COLORS.primary, fontWeight: '600', textAlign: 'center', fontStyle: 'italic' }}>
-            "Upload high-quality photos to get 3x more interest & matches!"
+            {i18n.t('register.highQualityPhotoHint')}
           </Text>
         </View>
       </View>
@@ -1785,25 +1974,29 @@ const RegisterScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
     </ScrollView>
-  );
+    );
+  };
 
 
 
 
   const renderPage5 = () => (
     <ScrollView contentContainerStyle={[styles.container, { paddingVertical: 5 }]} keyboardShouldPersistTaps="handled">
-      <Text style={[styles.authTitle, { fontSize: 20, marginBottom: 2 }]}>ID Verification</Text>
+      <Text style={[styles.authTitle, { fontSize: 20, marginBottom: 2 }]}>{i18n.t('register.idVerification.title')}</Text>
       <Text style={[styles.authSubtitle, { fontSize: 13, marginBottom: 10 }]}>
-        Secure your profile with government ID verification.
+        {i18n.t('register.idVerification.subtitle')}
+      </Text>
+      <Text style={[styles.authSubtitle, { fontSize: 12, marginBottom: 10 }]}>
+        {i18n.t('register.idVerification.imageSizeHint', { size: MAX_UPLOAD_SIZE_MB })}
       </Text>
 
       {/* Aadhar Card Block */}
       <View style={{ marginBottom: 15 }}>
         <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.black, marginBottom: 2 }}>
-          Aadhar Card <Text style={{ color: COLORS.primary }}>*</Text>
+          {i18n.t('register.idVerification.aadharTitle')} <Text style={{ color: COLORS.primary }}>*</Text>
         </Text>
         <Text style={{ fontSize: 12, color: COLORS.gray, marginBottom: 8, lineHeight: 16 }}>
-          Your ID is required for profile verification and building trust. Your data is safe & secure.
+          {i18n.t('register.idVerification.aadharHelp')}
         </Text>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -1834,7 +2027,7 @@ const RegisterScreen = ({ navigation }) => {
                   onPress={() => pickPhoto(setAadharFront)}
                 >
                   <Icon name="camera-outline" size={24} color={COLORS.gray} />
-                  <Text style={{ fontSize: 11, color: COLORS.gray, marginTop: 2 }}>Front Side</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.gray, marginTop: 2 }}>{i18n.t('register.idVerification.frontSide')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1867,7 +2060,7 @@ const RegisterScreen = ({ navigation }) => {
                   onPress={() => pickPhoto(setAadharBack)}
                 >
                   <Icon name="camera-outline" size={24} color={COLORS.gray} />
-                  <Text style={{ fontSize: 11, color: COLORS.gray, marginTop: 2 }}>Back Side</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.gray, marginTop: 2 }}>{i18n.t('register.idVerification.backSide')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1878,10 +2071,10 @@ const RegisterScreen = ({ navigation }) => {
       {/* Pan Card Block */}
       <View style={{ marginBottom: 15 }}>
         <Text style={{ fontSize: 16, fontWeight: '600', color: COLORS.black, marginBottom: 2 }}>
-          PAN Card (Optional)
+          {i18n.t('register.idVerification.panTitle')}
         </Text>
         <Text style={{ fontSize: 12, color: COLORS.gray, marginBottom: 8 }}>
-          Additional verification helps you get more matches.
+          {i18n.t('register.idVerification.panHelp')}
         </Text>
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -1912,7 +2105,7 @@ const RegisterScreen = ({ navigation }) => {
                   onPress={() => pickPhoto(setPanFront)}
                 >
                   <Icon name="camera-outline" size={24} color={COLORS.gray} />
-                  <Text style={{ fontSize: 11, color: COLORS.gray, marginTop: 2 }}>Front Side</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.gray, marginTop: 2 }}>{i18n.t('register.idVerification.frontSide')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1944,7 +2137,7 @@ const RegisterScreen = ({ navigation }) => {
                   onPress={() => pickPhoto(setPanBack)}
                 >
                   <Icon name="camera-outline" size={24} color={COLORS.gray} />
-                  <Text style={{ fontSize: 11, color: COLORS.gray, marginTop: 2 }}>Back Side</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.gray, marginTop: 2 }}>{i18n.t('register.idVerification.backSide')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -2149,7 +2342,7 @@ const RegisterScreen = ({ navigation }) => {
                     onPress={() => onChange('public')}
                   >
                     <Icon name="lock-open-outline" size={18} color={value === 'public' ? COLORS.white : COLORS.darkGray} style={{ marginRight: 6 }} />
-                    <Text style={{ fontSize: 14, color: value === 'public' ? COLORS.white : COLORS.darkGray, fontWeight: '500' }}>Public</Text>
+                    <Text style={{ fontSize: 14, color: value === 'public' ? COLORS.white : COLORS.darkGray, fontWeight: '500' }}>{i18n.t('privacy.public')}</Text>
                   </TouchableOpacity>
 
                   {/* Private Option */}
@@ -2170,7 +2363,7 @@ const RegisterScreen = ({ navigation }) => {
                     onPress={() => onChange('private')}
                   >
                     <Icon name="lock-closed-outline" size={18} color={value === 'private' ? COLORS.white : COLORS.darkGray} style={{ marginRight: 6 }} />
-                    <Text style={{ fontSize: 14, color: value === 'private' ? COLORS.white : COLORS.darkGray, fontWeight: '500' }}>Private</Text>
+                    <Text style={{ fontSize: 14, color: value === 'private' ? COLORS.white : COLORS.darkGray, fontWeight: '500' }}>{i18n.t('privacy.private')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2218,7 +2411,7 @@ const RegisterScreen = ({ navigation }) => {
             multiline
             numberOfLines={4}
             maxLength={ABOUT_ME_MAX}
-            error={errors.page6 && !aboutMe}
+            error={aboutMeError}
           />
 
           <Text style={styles.charCount}>

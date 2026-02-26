@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext } from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { COLORS, FONTS, SIZES } from '../constants/theme';
+import i18n from '../localization/i18n';
+import { LanguageContext } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
-const SuccessPopup = ({ visible, title, message, onClose, type = 'success' }) => {
+const SuccessPopup = ({ visible, title, message, onClose, type = 'success', buttonText }) => {
     // type can be 'success', 'error', 'info'
+    const { language } = useContext(LanguageContext);
+    const t = (key, opts) => i18n.t(key, { locale: language, lng: language, ...opts });
 
     const getIcon = () => {
         if (type === 'error') return 'alert-circle';
@@ -42,7 +46,7 @@ const SuccessPopup = ({ visible, title, message, onClose, type = 'success' }) =>
                         onPress={onClose}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.buttonText}>OK, Got It</Text>
+                        <Text style={styles.buttonText}>{buttonText || t('common.okGotIt')}</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -103,7 +107,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         textTransform: 'uppercase',
-     
+
     },
 });
 

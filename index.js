@@ -3,9 +3,24 @@ import 'react-native-reanimated';
 import './src/env';
 import { AppRegistry, PermissionsAndroid, Platform } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
-import notifee, { AndroidImportance } from '@notifee/react-native';
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import App from './App';
 import { name as appName } from './app.json';
+
+const PENDING_NOTIFICATION_NAVIGATION_KEY = 'pending_notification_navigation';
+
+const persistPendingNavigationData = async (data) => {
+  try {
+    if (!data || Object.keys(data).length === 0) return;
+    await AsyncStorage.setItem(
+      PENDING_NOTIFICATION_NAVIGATION_KEY,
+      JSON.stringify(data),
+    );
+  } catch (e) {
+    // non-blocking
+  }
+};
 
 // 🔥 Request all app permissions
 async function requestAppPermissions() {
@@ -20,8 +35,8 @@ async function requestAppPermissions() {
 
     await PermissionsAndroid.requestMultiple(basePermissions);
 
-    // 2️⃣ Notification Permission (Android 13+)
-    if (Platform.OS === 'android' && Platform.Version >= 33) {
+    // 2️⃣ Notification Permission (Android 13+ / iOS)
+    if ((Platform.OS === 'android' && Platform.Version >= 33) || Platform.OS === 'ios') {
       const authStatus = await messaging().requestPermission(); // REAL POPUP
 
       const enabled =
@@ -58,18 +73,57 @@ messaging().setBackgroundMessageHandler(async (remoteMessage) => {
     importance: AndroidImportance.HIGH,
   });
 
- const { title, body } = remoteMessage.notification || remoteMessage.data;
-const notificationTitle = remoteMessage.notification?.title || remoteMessage.data?.title;
-const notificationBody = remoteMessage.notification?.body || remoteMessage.data?.body;
+  // Avoid duplicate background notifications when payload already has `notification`.
+  // OS will show those automatically in background/quit.
+  if (!remoteMessage?.notification) {
+    const notificationTitle =
+      remoteMessage?.data?.title ||
+      remoteMessage?.data?.notificationTitle ||
+      (remoteMessage?.data?.type === 'message' ? 'New Message' : 'New Notification');
+    const notificationBody =
+      remoteMessage?.data?.body ||
+      remoteMessage?.data?.message ||
+      remoteMessage?.data?.notificationBody ||
+      '';
 
-if (notificationTitle || notificationBody) {
-  await notifee.displayNotification({
-    title: notificationTitle,
-    body: notificationBody,
-    android: { channelId: 'default' }
-  });
-}
+    if (notificationTitle || notificationBody) {
+      await notifee.displayNotification({
+        title: notificationTitle,
+        body: notificationBody,
+        data: remoteMessage?.data || {},
+        android: {
+          channelId: 'default',
+          pressAction: { id: 'default' },
+        },
+      });
+    }
+  }
 
 });
+
+notifee.onBackgroundEvent(async ({ type, detail }) => {
+  if (type === EventType.PRESS || type === EventType.ACTION_PRESS) {
+    const data = detail?.notification?.data || {};
+    await persistPendingNavigationData(data);
+  }
+});
+
+messaging().onNotificationOpenedApp(async (remoteMessage) => {
+  await persistPendingNavigationData(remoteMessage?.data || {});
+});
+
+messaging()
+  .getInitialNotification()
+  .then(async (remoteMessage) => {
+    await persistPendingNavigationData(remoteMessage?.data || {});
+  })
+  .catch(() => { });
+
+notifee
+  .getInitialNotification()
+  .then(async (initialNotification) => {
+    await persistPendingNavigationData(initialNotification?.notification?.data || {});
+  })
+  .catch(() => { });
 
 AppRegistry.registerComponent(appName, () => App);

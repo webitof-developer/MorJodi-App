@@ -31,9 +31,10 @@ import ContactScreen from '../screens/ContactScreen';
 import TermPrivacyScreen from '../screens/TermPrivacyScreen';
 import LanguageSettingScreen from '../screens/LanguageSettingScreen';
 import LanguageSelectScreen from '../screens/LanguageSelectScreen';
+import PartnerPreferenceScreen from '../screens/PartnerPreferenceScreen';
 import { fetchUnreadUserNotificationCount, fetchUnreadNotificationCount, } from '../redux/slices/notificationSlice';
 import i18n from '../localization/i18n';
-import { navigationRef } from './navigationRef';
+import { navigationRef, flushPendingNavigation } from './navigationRef';
 
 const Stack = createStackNavigator();
 
@@ -88,6 +89,7 @@ const AppNavigator = () => {
       ref={navigationRef}
       onReady={() => {
         routeNameRef.current = navigationRef.getCurrentRoute().name;
+        flushPendingNavigation();
       }}
       onStateChange={async () => {
         const previousRouteName = routeNameRef.current;
@@ -139,6 +141,15 @@ const AppNavigator = () => {
               options={{
                 headerShown: true,
                 headerTitle: i18n.t('headers.accountSettings'),
+                headerBackTitleVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="PartnerPreferenceSettings"
+              component={PartnerPreferenceScreen}
+              options={{
+                headerShown: true,
+                headerTitle: i18n.t('drawer.menu.partnerPreferences'),
                 headerBackTitleVisible: false,
               }}
             />

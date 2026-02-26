@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,289 +7,439 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
-  Modal,
-  Alert,
+  RefreshControl,
 
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
-import AntDesign from 'react-native-vector-icons/AntDesign';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import SubscriptionModal from '../components/SubscriptionModal';
 import { API_BASE_URL } from '../constants/config';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import SkeletonList from '../components/SkeletonList';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useProfileActions } from '../contexts/ProfileActionsContext';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+const calculateAge = (dob) => {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Visitor Card
+// ─────────────────────────────────────────────────────────────────────────────
+const VisitorCard = ({ item, onPress }) => {
+  const age = calculateAge(item.dateOfBirth);
+  const city = item.location?.city || '';
+  const state = item.location?.state || '';
+  const location = [city, state].filter(Boolean).join(', ');
+  const profession = item.profession?.title || '';
+  const religion = item.religion?.name || '';
+  const caste = item.caste?.name || '';
+
+  const subParts = [
+    age != null ? `${age} yrs` : null,
+    religion,
+    caste,
+    profession,
+  ].filter(Boolean);
+
+  return (
+    <TouchableOpacity style={styles.visitorCard} onPress={onPress} activeOpacity={0.8}>
+      {/* Avatar */}
+      <View style={styles.avatarWrap}>
+        <Image
+          source={
+            item?.photos?.length > 0
+              ? { uri: item.photos[0] }
+              : require('../assets/plaseholder.png')
+          }
+          style={styles.avatar}
+        />
+        {item.isPremium && (
+          <View style={styles.premiumBadge}>
+            <Ionicons name="star" size={8} color="#fff" />
+          </View>
+        )}
+      </View>
+
+      {/* Info */}
+      <View style={styles.infoWrap}>
+        <View style={styles.nameRow}>
+          <Text style={styles.visitorName} numberOfLines={1}>{item.fullName}</Text>
+          {item.isPremium && (
+            <View style={styles.premiumPill}>
+              <Text style={styles.premiumPillText}>Premium</Text>
+            </View>
+          )}
+        </View>
+
+        {subParts.length > 0 && (
+          <Text style={styles.subText} numberOfLines={1}>{subParts.join(' · ')}</Text>
+        )}
+
+        {location ? (
+          <View style={styles.locRow}>
+            <Ionicons name="location-outline" size={11} color={COLORS.gray} />
+            <Text style={styles.locText} numberOfLines={1}>{location}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Arrow */}
+      <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
+    </TouchableOpacity>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Screen
+// ─────────────────────────────────────────────────────────────────────────────
 const ProfileVisitorsScreen = ({ navigation }) => {
-  const { token } = useSelector(state => state.auth);
-  console.log(token)
-  const { subscription } = useSelector(state => state.subscription);
+  const { token } = useSelector((state) => state.auth);
+
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
-  const [subscriptionModalMessage, setSubscriptionModalMessage] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [totalUnique, setTotalUnique] = useState(0);
+  // ProfileActionsContext — gate check + openProfileById (same as MessageScreen)
+  const {
+    openProfileById,
+    handleViewVisitors,
+    subscriptionModalVisible,
+    subscriptionModalMessage,
+    setSubscriptionModalVisible,
+    handleSubscriptionUpgrade,
+  } = useProfileActions(null);
 
-  useEffect(() => {
-    const fetchProfileVisitors = async () => {
-      try {
-        setLoading(true);
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        const response = await axios.get(
-          `${API_BASE_URL}/api/user/viewers`,
-          config,
-        );
-        console.log('Profile Visitors Response:', response.data);
-        setVisitors(response.data.viewers);
-      } catch (err) {
-        // //console.error("Error fetching profile visitors:", err);
-        setError('Failed to load profile visitors.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (token) {
-      fetchProfileVisitors();
+  // ─────────────────────────────────────────────────────────────────────────
+  // Fetch
+  // ─────────────────────────────────────────────────────────────────────────
+  const fetchVisitors = useCallback(async () => {
+    if (!token) return;
+    try {
+      setError(null);
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const response = await axios.get(`${API_BASE_URL}/api/user/viewers`, config);
+      const list = response.data?.viewers || [];
+      setVisitors(list);
+      setTotalUnique(response.data?.totalUnique ?? list.length);
+    } catch (err) {
+      setError('Failed to load profile visitors. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   }, [token]);
-  const calculateAge = dob => {
-    if (!dob) return '-';
-    const birthDate = new Date(dob);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (
-      monthDiff < 0 ||
-      (monthDiff === 0 && today.getDate() < birthDate.getDate())
-    ) {
-      age--;
-    }
-    return age;
-  };
 
-  const openProfile = async (item) => {
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/api/user/view/${item._id}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+  useEffect(() => {
+    if (!token) return;
 
-      if (response.data.success) {
-        navigation.navigate('ProfileDetailScreen', {
-          profileId: item._id,
-          item,
-        });
-        return;
+    // Check access gate first — only fetch visitors if access is granted.
+    // If limit/no-access, the hook already shows SubscriptionModal; go back.
+    handleViewVisitors().then((granted) => {
+      if (granted) {
+        fetchVisitors();
+      } else {
+        // Gate denied — go back so user isn't stuck on a blank screen
+        navigation.goBack();
       }
-    } catch (error) {
-      const res = error.response;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
-      // 🔒 PRIVATE PROFILE (same behaviour as HomeProfileCard)
-      if (res?.data?.code === "PRIVATE_PROFILE") {
-        setSubscriptionModalMessage(
-          res.data.message ||
-          `This profile is private. Upgrade your plan to unlock ${item.fullName}.`
-        );
-        setSubscriptionModalVisible(true);
-        return;
-      }
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchVisitors();
+  }, [fetchVisitors]);
 
-      // ⛔ LIMIT REACHED
-      if (res?.data?.code === "LIMIT_REACHED") {
-        setSubscriptionModalMessage(
-          res.data.message ||
-          "You have reached your daily profile view limit. Upgrade to continue."
-        );
-        setSubscriptionModalVisible(true);
-        return;
-      }
-
-      alert(res?.data?.message || "Unable to open profile. Please try again.");
-    }
-  };
-  ;
-
-
-  const renderVisitorItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.visitorCard}
-      onPress={() => openProfile(item)}
-      activeOpacity={0.8}
-    >
-      <Image
-        source={
-          item?.photos?.length > 0
-            ? { uri: item.photos[0] }
-            : require('../assets/plaseholder.png')
-        }
-        style={styles.visitorImage}
-      />
-
-      <View style={styles.visitorInfo}>
-        <Text style={styles.visitorName}>{item.fullName}</Text>
-        <Text style={styles.visitorDetails}>
-          {calculateAge(item.dateOfBirth)} yrs, {item.religion?.name}
-        </Text>
-        <Text style={styles.visitorDetails}>
-          {item.location?.city || '-'}, {item.location?.state || '-'}
-        </Text>
-      </View>
-    </TouchableOpacity>
+  // Use context openProfileById — handles PRIVATE_PROFILE / LIMIT_REACHED via SubscriptionModal
+  const openProfileWithGate = useCallback(
+    (item) => openProfileById(item),
+    [openProfileById],
   );
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#f6f6fb' }}>
-        <SkeletonList count={8} />
-      </View>
-    );
-  }
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
 
-  if (error) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
-    );
-  }
-
-  return (
-    <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
-      <View style={styles.container}>
-        {visitors.length === 0 ? (
-          <View style={styles.centered}>
-            <Text style={styles.noDataText}>
-              No one has viewed your profile yet.
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={visitors}
-            renderItem={renderVisitorItem}
-            keyExtractor={item => item._id}
-            contentContainerStyle={styles.listContent}
-          />
-        )}
+        <View style={{ flex: 1, backgroundColor: '#f6f6fb' }}>
+          <SkeletonList count={8} />
+        </View>
         <SubscriptionModal
           visible={subscriptionModalVisible}
           message={subscriptionModalMessage}
           onClose={() => setSubscriptionModalVisible(false)}
-          onUpgradePress={() => {
-            setSubscriptionModalVisible(false);
-            navigation.navigate('App', {
-              screen: 'HomeTabs',
-              params: {
-                screen: 'Upgrade'
-              }
-            });
-          }}
+          onUpgradePress={handleSubscriptionUpgrade}
         />
+      </SafeAreaView>
+    );
+  }
 
-      </View>
+  // function renderHeader() {
+  //   return (
+  //     <View style={styles.header}>
+  //       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+  //         <Ionicons name="arrow-back" size={22} color={COLORS.black} />
+  //       </TouchableOpacity>
+  //       <View>
+  //         <Text style={styles.headerTitle}>Profile Visitors</Text>
+  //         {totalUnique > 0 && (
+  //           <Text style={styles.headerSub}>{totalUnique} unique viewer{totalUnique !== 1 ? 's' : ''}</Text>
+  //         )}
+  //       </View>
+  //       <View style={{ width: 36 }} />
+  //     </View>
+  //   );
+  // }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+
+        <View style={styles.centered}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={56} color={COLORS.gray + '80'} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={fetchVisitors}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+        <SubscriptionModal
+          visible={subscriptionModalVisible}
+          message={subscriptionModalMessage}
+          onClose={() => setSubscriptionModalVisible(false)}
+          onUpgradePress={handleSubscriptionUpgrade}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+
+
+      {visitors.length === 0 ? (
+        <View style={styles.centered}>
+          <MaterialCommunityIcons name="eye-off-outline" size={64} color={COLORS.gray + '80'} />
+          <Text style={styles.noDataText}>No one has viewed your profile yet.</Text>
+          <Text style={styles.noDataSub}>
+            Complete your profile and stay active to attract visitors!
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={visitors}
+          keyExtractor={(item) => item._id}
+          renderItem={({ item }) => (
+            <VisitorCard
+              item={item}
+              onPress={() => openProfileWithGate(item)}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.primary]}
+            />
+          }
+        />
+      )}
+
+      <SubscriptionModal
+        visible={subscriptionModalVisible}
+        message={subscriptionModalMessage}
+        onClose={() => setSubscriptionModalVisible(false)}
+        onUpgradePress={handleSubscriptionUpgrade}
+      />
     </SafeAreaView>
   );
 };
 
+export default ProfileVisitorsScreen;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
+    backgroundColor: COLORS.white,
+  },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SIZES.padding,
+    paddingVertical: 12,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    ...FONTS.h3,
+    color: COLORS.black,
+    textAlign: 'center',
+  },
+  headerSub: {
+    fontSize: 12,
+    color: COLORS.gray,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+
+  // List
+  listContent: {
+    paddingVertical: 10,
+    paddingBottom: 30,
+    flexGrow: 1,
     backgroundColor: '#f6f6fb',
   },
+
+  // Visitor Card
+  visitorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    paddingVertical: 12,
+    paddingHorizontal: SIZES.padding,
+    marginHorizontal: SIZES.padding,
+    marginBottom: 8,
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  avatarWrap: {
+    position: 'relative',
+    marginRight: 14,
+  },
+  avatar: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: COLORS.gray + '40',
+  },
+  premiumBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: '#FFA000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.white,
+  },
+  infoWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 3,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  visitorName: {
+    ...FONTS.body4,
+    fontWeight: '700',
+    color: COLORS.black,
+    flexShrink: 1,
+  },
+  premiumPill: {
+    backgroundColor: '#FFF3CD',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  premiumPillText: {
+    fontSize: 9,
+    color: '#856404',
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  subText: {
+    fontSize: 12,
+    color: COLORS.darkGray,
+  },
+  locRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  locText: {
+    fontSize: 11,
+    color: COLORS.gray,
+    flexShrink: 1,
+  },
+
+  // Empty / Error
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  errorText: {
-    ...FONTS.body3,
-    color: COLORS.red,
+    paddingHorizontal: 30,
+    backgroundColor: '#f6f6fb',
   },
   noDataText: {
     ...FONTS.h3,
     color: COLORS.darkGray,
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: 16,
   },
-  listContent: {
-    paddingVertical: 10,
-    flexGrow: 1
-  },
-  visitorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingVertical: 14,
-    paddingHorizontal: SIZES.padding,
-    marginHorizontal: SIZES.padding,
-    marginBottom: 8,
-    borderRadius: 12,
-    // Soft Shadow
-    shadowColor: '#ffffffff',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  visitorImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 14,
-    backgroundColor: COLORS.gray,
-  },
-  visitorInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  visitorName: {
+  noDataSub: {
     ...FONTS.body4,
-    color: COLORS.black,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  visitorDetails: {
-    fontSize: 11,
     color: COLORS.gray,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    padding: SIZES.padding,
-    borderRadius: SIZES.radius,
-    alignItems: 'center',
-  },
-  modalText: {
-    ...FONTS.h3,
-    marginBottom: SIZES.base,
-    marginTop: SIZES.base,
-  },
-  subscriptionButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SIZES.base,
-    paddingHorizontal: SIZES.padding,
-    borderRadius: SIZES.radius,
-    marginBottom: SIZES.base,
-    marginTop: SIZES.base,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-  },
-  buttonText: {
-    color: COLORS.white,
+  errorText: {
     ...FONTS.body3,
+    color: COLORS.gray,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  retryBtn: {
+    marginTop: 20,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 20,
+  },
+  retryText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
-
-export default ProfileVisitorsScreen;

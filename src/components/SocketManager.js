@@ -9,7 +9,12 @@ import { AppState, DeviceEventEmitter } from "react-native";
 import { useDispatch } from "react-redux";
 import io from "socket.io-client";
 import { API_BASE_URL } from "../constants/config";
-import { fetchUnreadUserNotificationCount } from "../redux/slices/notificationSlice";
+import {
+  addNotification,
+  fetchUnreadNotificationCount,
+  fetchUnreadUserNotificationCount,
+} from "../redux/slices/notificationSlice";
+import { fetchUnreadMessageCount } from "../redux/slices/messageSlice";
 
 // --------------------------------------------------------
 // CONTEXT EXPORT
@@ -49,7 +54,9 @@ const SocketManager = ({ user, children }) => {
     socket.on("connect", () => {
       console.log("🟢 Socket connected");
       socket.emit("registerUser", user._id);
+      dispatch(fetchUnreadNotificationCount());
       dispatch(fetchUnreadUserNotificationCount());
+      dispatch(fetchUnreadMessageCount());
     });
 
     // --------------------------------------------------------
@@ -74,17 +81,19 @@ const SocketManager = ({ user, children }) => {
     // --------------------------------------------------------
     socket.on("new_notification", (notification) => {
       console.log("New notification:", notification);
-      dispatch(fetchUnreadUserNotificationCount()); // Keep updating badge count
-
-      // ✅ Add to list locally to avoid refresh
-      // Import addNotification inside the component or outside if cyclic dependency isn't an issue. 
-      // Safe to dispatch plain object if action import is tricky, but here we can import it.
-      const { addNotification } = require("../redux/slices/notificationSlice");
       dispatch(addNotification(notification));
+      dispatch(fetchUnreadNotificationCount());
+      dispatch(fetchUnreadUserNotificationCount()); // Keep updating badge count
+    });
+
+    socket.on("notification_count_update", () => {
+      dispatch(fetchUnreadNotificationCount());
+      dispatch(fetchUnreadUserNotificationCount());
     });
 
     socket.on("newMessage", (message) => {
       if (message.sender !== user._id) {
+        dispatch(fetchUnreadMessageCount());
         dispatch(fetchUnreadUserNotificationCount());
       }
     });
@@ -92,6 +101,8 @@ const SocketManager = ({ user, children }) => {
     socket.on("messageStatusUpdate", (data) => {
       // If status is read, update unread counts
       if (data?.status === 'read') {
+        dispatch(fetchUnreadMessageCount());
+        dispatch(fetchUnreadNotificationCount());
         dispatch(fetchUnreadUserNotificationCount());
       }
     });

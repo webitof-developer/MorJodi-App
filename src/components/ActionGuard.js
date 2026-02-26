@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import AwesomeAlert from './AwesomeAlert';
 import { COLORS, FONTS } from '../constants/theme'; // Ensure these exist
+import i18n from '../localization/i18n';
 
 /**
  * Universal ActionGuard
@@ -28,9 +29,9 @@ const ActionGuard = ({ children, onAction, restrict = 'approval' }) => {
         // 1. Check Approval
         if ((restrict === 'approval' || restrict === 'both') && !isApproved) {
             setAlertConfig({
-                title: "Account Pending",
-                message: "Your account is currently under review by the admin. You will be able to access this feature once approved.",
-                confirmText: "OK",
+                title: i18n.t('actionGuard.accountPendingTitle'),
+                message: i18n.t('actionGuard.accountPendingMessage'),
+                confirmText: i18n.t('actionGuard.ok'),
                 onConfirm: () => setShowAlert(false)
             });
             setShowAlert(true);
@@ -40,11 +41,11 @@ const ActionGuard = ({ children, onAction, restrict = 'approval' }) => {
         // 2. Check Premium
         if ((restrict === 'premium' || restrict === 'both') && !isPremium) {
             setAlertConfig({
-                title: "Premium Feature",
-                message: "This feature is available only for premium members. Upgrade now to unlock!",
-                confirmText: "Upgrade",
+                title: i18n.t('actionGuard.premiumFeatureTitle'),
+                message: i18n.t('actionGuard.premiumFeatureMessage'),
+                confirmText: i18n.t('actionGuard.upgrade'),
                 showCancel: true,
-                cancelText: "Cancel",
+                cancelText: i18n.t('actionGuard.cancel'),
                 onConfirm: () => {
                     setShowAlert(false);
                     navigation.navigate('Upgrade'); // Ensure 'Upgrade' route exists

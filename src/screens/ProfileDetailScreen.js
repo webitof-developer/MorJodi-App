@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useContext, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,10 +28,13 @@ import UserStatus from '../components/UserStatus';
 import LinearGradient from 'react-native-linear-gradient';
 const { width } = Dimensions.get('window');
 import SubscriptionModal from '../components/SubscriptionModal';
+import AwesomeAlert from '../components/AwesomeAlert';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fetchSubscription } from '../redux/slices/subscriptionSlice';
 import i18n from '../localization/i18n';
+import { LanguageContext } from '../contexts/LanguageContext';
+import { useProfileActions } from '../contexts/ProfileActionsContext';
 
 const STICKY_OVERLAY_HEIGHT = 60;
 const STICKY_TABS_HEIGHT = 50;
@@ -40,26 +43,39 @@ const STICKY_OFFSET = STICKY_OVERLAY_HEIGHT + STICKY_TABS_HEIGHT;
 
 const ProfileDetailScreen = ({ route, navigation }) => {
   const { profileId, item } = route.params;
-  console.log('item', item);
-  console.log('profileId', profileId);
   const dispatch = useDispatch();
   const { token, user } = useSelector(state => state.auth);
+  const { language } = useContext(LanguageContext);
   const { subscription } = useSelector(state => state.subscription);
   const { isBlocked, blockProfile, unblockProfile } = useBlock();
-  const { isLiked, likeProfile, unlikeProfile } = useLike();
-  const {
-    sentInterests,
-    receivedInterests,
-    getInterestStatus,
-    hasAcceptedInterest,
-    sendInterest,
-    acceptInterest,
-    unsendInterest,
-    removeAcceptedInterest,
-  } = useInterest();
-  const displayName = profile?.fullName || item?.fullName || 'this profile';
-
+  const { isLiked } = useLike();
   const { onlineUsers } = useSocket();
+
+  // ── Unified profile actions ───────────────────────────────────
+  const {
+    openProfile: _openProfile, // not needed — we ARE the detail screen
+    handleImagePress,
+    handleInterestPress,
+    handleContactInfoPress,
+    handleCreateChat,
+    handleLikeUnlike,
+    isInterestSent,
+    isInterestReceived,
+    isInterestAccepted,
+    isUnlocked,
+    isPaidActive,
+    contactData,
+    contactLoading,
+    contactModalVisible,
+    setContactModalVisible,
+    subscriptionModalVisible,
+    subscriptionModalMessage,
+    setSubscriptionModalVisible,
+    handleSubscriptionUpgrade,
+    interestAlertState,
+    dismissInterestAlert,
+  } = useProfileActions(item);
+
   const status = item?._id
     ? onlineUsers?.[item._id] || {
       status: 'offline',
@@ -68,23 +84,27 @@ const ProfileDetailScreen = ({ route, navigation }) => {
     : { status: 'offline', lastActive: null };
 
   const [profile, setProfile] = useState(null);
+  const displayName = profile?.fullName || item?.fullName || 'this profile';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [serverDown, setServerDown] = useState(false);
-  const [optionsModalVisible, setOptionsModalVisible] = useState(false); // Renamed for clarity (Block/Share)
-  const [imagePrivacyModalVisible, setImagePrivacyModalVisible] =
-    useState(false); // NEW STATE
+  const [optionsModalVisible, setOptionsModalVisible] = useState(false);
   const [isOverlaySticky, setIsOverlaySticky] = useState(false);
   const [isTabsSticky, setIsTabsSticky] = useState(false);
   const [layouts, setLayouts] = useState({});
   const [activeTab, setActiveTab] = useState('about');
   const [matchData, setMatchData] = useState(null);
   const scrollViewRef = useRef(null);
-  const [contactModalVisible, setContactModalVisible] = useState(false);
-  const [contactData, setContactData] = useState(null);
-  const [contactLoading, setContactLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [localInterest, setLocalInterest] = useState(getInterestStatus(item._id));
+  const [profileAccessBlocked, setProfileAccessBlocked] = useState(false);
+
+  const activePlan = subscription?.subscription?.plan;
+  const planName = activePlan?.name?.toLowerCase?.();
+  const planIsFree =
+    activePlan?.isFree ??
+    (typeof activePlan?.price === 'number' && activePlan.price === 0) ??
+    (planName ? planName.includes('free') : false);
+
   const t = key => i18n.t(`profileDetail.${key}`);
   const translateCriterion = value => {
     if (!value) {
@@ -125,45 +145,6 @@ const ProfileDetailScreen = ({ route, navigation }) => {
   };
 
   useEffect(() => {
-    // Keep interest status in sync when lists change; avoid depending on the function identity
-    setLocalInterest(getInterestStatus(item._id));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sentInterests, receivedInterests, item._id]);
-
-  const isInterestSent =
-    localInterest.type === 'sent' && localInterest.status === 'pending';
-
-  const isInterestReceived =
-    localInterest.type === 'received' && localInterest.status === 'pending';
-
-  const isInterestAccepted = localInterest.status === 'accepted';
-
-  const [subscriptionModalVisible, setSubscriptionModalVisible] =
-    useState(false);
-  const [subscriptionModalMessage, setSubscriptionModalMessage] = useState('');
-  const activePlan = subscription?.subscription?.plan;
-  const planName = activePlan?.name?.toLowerCase?.();
-  const planIsFree =
-    activePlan?.isFree ??
-    (typeof activePlan?.price === 'number' && activePlan.price === 0) ??
-    (planName ? planName.includes('free') : false);
-  const isPaidActive =
-    subscription?.status === 'active' &&
-    ((activePlan && (planIsFree === false || planIsFree === undefined)) ||
-      !activePlan);
-
-  const handleSubscription = () => {
-    setSubscriptionModalVisible(false);
-    navigation.navigate('HomeTabs', { screen: 'Upgrade' });
-  };
-
-  const showSubscriptionModal = message => {
-    if (isPaidActive) return;
-    setSubscriptionModalMessage(message);
-    setSubscriptionModalVisible(true);
-  };
-
-  useEffect(() => {
     if (token && !subscription) {
       dispatch(fetchSubscription());
     }
@@ -189,11 +170,24 @@ const ProfileDetailScreen = ({ route, navigation }) => {
           throw new Error('Invalid profile response');
         }
         setProfile(userData);
+        setProfileAccessBlocked(false);
         setServerDown(false);
       } catch (err) {
         const res = err.response;
         if (!res || res?.status >= 500) {
           setServerDown(true);
+        }
+        if (
+          res?.data?.code === 'PRIVATE_PROFILE' ||
+          res?.data?.code === 'LIMIT_REACHED' ||
+          res?.data?.code === 'FEATURE_NOT_AVAILABLE'
+        ) {
+          setProfileAccessBlocked(true);
+          showSubscriptionModal(
+            res?.data?.message || i18n.t('profile.private', { name: displayName || 'profile', lng: language }),
+            true,
+          );
+          return;
         }
         if (res?.status === 403) {
           if (!isPaidActive) {
@@ -214,8 +208,6 @@ const ProfileDetailScreen = ({ route, navigation }) => {
     fetchProfile();
   }, [profileId, token, isPaidActive, reloadKey]);
 
-  const isUnlocked = hasAcceptedInterest(item._id);
-
   // Normalize ObjectId or primitive to string for comparison
   const normalizeId = value => {
     if (!value) return null;
@@ -230,12 +222,17 @@ const ProfileDetailScreen = ({ route, navigation }) => {
     if (!profile || !user?.partnerPreference) return null;
     const prefs = user.partnerPreference;
     let matched = [];
+    let unmatched = [];
     let total = 0;
 
     const addCriteria = (label, condition, enabled = true) => {
       if (!enabled) return;
       total += 1;
-      if (condition) matched.push(label);
+      if (condition) {
+        matched.push(label);
+      } else {
+        unmatched.push(label);
+      }
     };
 
     // Age
@@ -381,84 +378,44 @@ const ProfileDetailScreen = ({ route, navigation }) => {
       Array.isArray(prefGotra),
     );
 
-    return { matched, total };
+    return { matched, unmatched, total };
   }, [profile, user?.partnerPreference]);
 
-  const handleCreateChat = async recipientId => {
-    try {
-      const { data } = await axios.post(
-        `${API_BASE_URL}/api/chat/create`,
-        { recipientId },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      navigation.navigate('MessageScreen', { chatId: data.chat._id });
-    } catch (error) {
-      // //console.error("Error creating chat:", error);
-    }
-  };
-  const handleInterestPress = async () => {
-    const { type, status: st, interestId } = localInterest;
+  const isPartnerPreferenceComplete = useMemo(() => {
+    const prefs = user?.partnerPreference;
+    if (!prefs) return false;
 
-    // Send new interest
-    if (type === 'none') {
-      const result = await sendInterest(item._id);
+    const hasRange = range =>
+      Array.isArray(range) &&
+      range.length === 2 &&
+      Number.isFinite(Number(range[0])) &&
+      Number.isFinite(Number(range[1])) &&
+      Number(range[0]) <= Number(range[1]);
 
-      if (result?.subscriptionRequired) {
-        showSubscriptionModal(result.message);
-        return;
-      }
+    const hasArrayValues = value => Array.isArray(value) && value.length > 0;
+    const hasStringValue = value =>
+      typeof value === 'string' && value.trim().length > 0;
 
-      Alert.alert("Interest Sent", "Your interest has been sent.");
-      return;
-    }
+    return (
+      hasRange(prefs.ageRange) &&
+      hasRange(prefs.heightRange) &&
+      hasArrayValues(prefs.maritalStatus) &&
+      hasArrayValues(prefs.children) &&
+      hasArrayValues(prefs.manglik) &&
+      hasArrayValues(prefs.religion) &&
+      hasArrayValues(prefs.caste) &&
+      hasArrayValues(prefs.subCaste) &&
+      hasArrayValues(prefs.gotra) &&
+      hasArrayValues(prefs.motherTongue) &&
+      hasArrayValues(prefs.raasi) &&
+      hasArrayValues(prefs.education) &&
+      hasArrayValues(prefs.profession) &&
+      hasArrayValues(prefs.location) &&
+      hasStringValue(prefs.annualIncome)
+    );
+  }, [user?.partnerPreference]);
 
-    // Unsend interest
-    if (type === 'sent' && st === 'pending') {
-      Alert.alert('Unsend Interest?', 'Do you want to remove this interest?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Unsend', onPress: () => unsendInterest(interestId) },
-      ]);
-      return;
-    }
 
-    // Accept received interest
-    if (type === 'received' && st === 'pending') {
-      Alert.alert('Accept Interest?', 'Do you want to accept this interest?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Accept', onPress: () => acceptInterest(interestId) },
-      ]);
-      return;
-    }
-
-    if (st === 'accepted') {
-      Alert.alert(
-        'Remove Accepted Interest?',
-        'This will remove the mutual interest.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Remove',
-            style: 'destructive',
-            onPress: () => removeAcceptedInterest(interestId),
-          },
-        ]
-      );
-      return;
-    }
-  };
-
-  const handleLikeUnlike = async id => {
-    if (!id) return;
-    try {
-      if (isLiked(id)) {
-        await unlikeProfile(id);
-      } else {
-        await likeProfile(id);
-      }
-    } catch (err) {
-      console.log('Like/unlike error:', err.message);
-    }
-  };
 
   const renderServerError = message => (
     <SafeAreaView
@@ -580,6 +537,9 @@ const ProfileDetailScreen = ({ route, navigation }) => {
         // Fallback: compute locally if API returns empty criteria or zero percent
         const local = computeLocalMatch();
         let displayCriteria = criteria;
+        let displayUnmatchedCriteria = Array.isArray(local?.unmatched)
+          ? local.unmatched
+          : [];
         if ((!criteria.length || percent === 0) && local) {
           if (local.matched.length) {
             displayCriteria = local.matched;
@@ -594,6 +554,7 @@ const ProfileDetailScreen = ({ route, navigation }) => {
         setMatchData({
           ...data,
           matchedCriteria: displayCriteria,
+          unmatchedCriteria: displayUnmatchedCriteria,
           matchPercentage: percent,
         });
       } catch (err) {
@@ -643,61 +604,7 @@ const ProfileDetailScreen = ({ route, navigation }) => {
   };
 
 
-  const handleContactInfoPress = async () => {
-    try {
-      setContactLoading(true);
-      const { data } = await axios.get(
-        `${API_BASE_URL}/api/user/profile/${profileId}/contact`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      console.log('Contact API Response:', data);
-      setContactData(data);
-      setContactModalVisible(true);
-    } catch (error) {
-      const res = error.response;
 
-      if (res?.data?.code === 'PRIVATE_PROFILE') {
-        if (!isPaidActive) {
-          showSubscriptionModal(
-            res.data.message ||
-            'This contact info is private. Upgrade your plan to unlock it.',
-          );
-        } else {
-          Alert.alert('Private', 'This user has kept contact details private.');
-        }
-        return;
-      }
-
-      if (res?.data?.code === 'LIMIT_REACHED') {
-        if (!isPaidActive) {
-          showSubscriptionModal(
-            res.data.message ||
-            'You have reached your contact view limit. Upgrade your plan to view more contacts.',
-          );
-        } else {
-          Alert.alert('Limit reached', 'Contact view limit reached.');
-        }
-        return;
-      }
-
-      if (res?.status === 403) {
-        if (!isPaidActive) {
-          showSubscriptionModal(
-            res.data?.message ||
-            "You need a premium plan to view this user's contact details.",
-          );
-        } else {
-          Alert.alert('Error', 'Contact details are not available right now.');
-        }
-        return;
-      }
-
-      console.log('Contact fetch error:', res?.data || error.message);
-      Alert.alert('Error', 'Failed to load contact details.');
-    } finally {
-      setContactLoading(false);
-    }
-  };
 
   const handleBlockToggle = async () => {
     if (!profile?._id) return;
@@ -728,69 +635,7 @@ const ProfileDetailScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleImagePress = async (photos, index = 0) => {
-    try {
-      if (!profileId || !token) return;
 
-      const res = await axios.get(
-        `${API_BASE_URL}/api/user/profile/${profileId}/photos`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      if (res.data?.success) {
-        const imageList = res.data.photos?.length ? res.data.photos : photos;
-        navigation.navigate('PhotoPreview', {
-          photos: imageList,
-          startIndex: index,
-        });
-        return;
-      }
-    } catch (error) {
-      const res = error.response;
-
-      // Private photos
-      if (res?.data?.code === 'PRIVATE_PHOTOS') {
-        if (!isPaidActive) {
-          showSubscriptionModal(
-            res.data.message ||
-            'These photos are available only to eligible members. Upgrade to unlock access.',
-          );
-        } else {
-          Alert.alert('Private', 'Photos are not available to view.');
-        }
-        return;
-      }
-
-      // Daily limit reached
-      if (res?.data?.code === 'LIMIT_REACHED') {
-        if (!isPaidActive) {
-          showSubscriptionModal(
-            res.data.message ||
-            'You have reached your daily photo view limit. Upgrade your plan to continue viewing photos.',
-          );
-        } else {
-          Alert.alert('Limit reached', 'Photo view limit reached for today.');
-        }
-        return;
-      }
-
-      // Forbidden / subscription gate
-      if (res?.status === 403) {
-        if (!isPaidActive) {
-          showSubscriptionModal(
-            res.data?.message ||
-            "You don't have access to view these photos. Upgrade your subscription to unlock them.",
-          );
-        } else {
-          Alert.alert('Error', 'Photos are not available to view right now.');
-        }
-        return;
-      }
-
-      console.log('Photo View Error:', res?.data || error.message);
-      Alert.alert('Error', 'Unable to load photos.');
-    }
-  };
 
   const calculateAge = dob => {
     if (!dob) return '-';
@@ -824,6 +669,23 @@ const ProfileDetailScreen = ({ route, navigation }) => {
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
+    );
+  }
+
+  if (profileAccessBlocked && !profile) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <SubscriptionModal
+          visible={subscriptionModalVisible}
+          profileName={displayName}
+          message={subscriptionModalMessage}
+          onUpgradePress={handleSubscription}
+          onClose={() => {
+            setSubscriptionModalVisible(false);
+            navigation.goBack();
+          }}
+        />
+      </SafeAreaView>
     );
   }
 
@@ -1091,6 +953,11 @@ const ProfileDetailScreen = ({ route, navigation }) => {
                 value={`${profile.location?.city || '-'}, ${profile.location?.state || '-'
                   },,${profile.location?.country || '-'}`}
               />
+              <DetailItem
+                icon="text-account"
+                label={t('aboutMe')}
+                value={profile.aboutMe?.trim() || '-'}
+              />
             </View>
             <View
               onLayout={e => handleTabLayout(e, 'family')}
@@ -1249,6 +1116,21 @@ const ProfileDetailScreen = ({ route, navigation }) => {
               style={styles.section}
             >
               <Text style={styles.sectionTitle}>{t('matchSection')}</Text>
+              {!isPartnerPreferenceComplete && (
+                <View style={styles.partnerPreferenceWarningBox}>
+                  <Text style={styles.partnerPreferenceWarningText}>
+                    {t('partnerPreferenceIncomplete')}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.partnerPreferenceWarningButton}
+                    onPress={() => navigation.navigate('PartnerPreferenceSettings')}
+                  >
+                    <Text style={styles.partnerPreferenceWarningButtonText}>
+                      {t('updatePartnerPreferenceButton')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
               {matchData ? (
                 <View>
                   <View style={styles.matchContainer}>
@@ -1275,23 +1157,45 @@ const ProfileDetailScreen = ({ route, navigation }) => {
                       style={styles.matchPhoto}
                     />
                   </View>
-                  <View style={styles.matchedCriteriaContainer}>
-                    <Text style={styles.matchedCriteriaTitle}>
-                      {t('matchedCriteriaTitle')}
-                    </Text>
-                    {Array.isArray(matchData.matchedCriteria) &&
-                      matchData.matchedCriteria.length > 0 ? (
-                      matchData.matchedCriteria.map((criterion, index) => (
-                        <Text key={index} style={styles.matchedCriterion}>
-                          {translateCriterion(criterion)}
+                  {/* ── Two-column criteria ── */}
+                  {(matchData.matchedCriteria?.length > 0 || matchData.unmatchedCriteria?.length > 0) ? (
+                    <View style={styles.criteriaColumns}>
+                      {/* LEFT – Matched */}
+                      <View style={styles.criteriaCol}>
+                        <Text style={styles.criteriaColTitle}>
+                          {t('matchedCriteriaTitle')} ({matchData.matchedCriteria?.length || 0})
                         </Text>
-                      ))
-                    ) : (
-                      <Text style={styles.detailValueText}>
-                        {t('noMatchingCriteria')}
-                      </Text>
-                    )}
-                  </View>
+                        {(matchData.matchedCriteria ?? []).map((c, i) => (
+                          <Text key={i} style={styles.criteriaColItem}>
+                            {translateCriterion(c)}
+                          </Text>
+                        ))}
+                        {!matchData.matchedCriteria?.length && (
+                          <Text style={styles.criteriaColItem}>—</Text>
+                        )}
+                      </View>
+
+                      {/* Divider */}
+                      <View style={styles.criteriaDivider} />
+
+                      {/* RIGHT – Not Matched */}
+                      <View style={styles.criteriaCol}>
+                        <Text style={styles.criteriaColTitle}>
+                          {t('unmatchedCriteriaTitle')} ({matchData.unmatchedCriteria?.length || 0})
+                        </Text>
+                        {(matchData.unmatchedCriteria ?? []).map((c, i) => (
+                          <Text key={i} style={styles.criteriaColItem}>
+                            {translateCriterion(c)}
+                          </Text>
+                        ))}
+                        {!matchData.unmatchedCriteria?.length && (
+                          <Text style={styles.criteriaColItem}>—</Text>
+                        )}
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={styles.detailValueText}>{t('noMatchingCriteria')}</Text>
+                  )}
                 </View>
               ) : (
                 <Text style={styles.detailValueText}>
@@ -1419,10 +1323,33 @@ const ProfileDetailScreen = ({ route, navigation }) => {
           {/* Modal 2: Image Privacy/Subscription Prompt (NEW) */}
           <SubscriptionModal
             visible={subscriptionModalVisible}
-            profileName={displayName} // or pass null if you don't care
+            profileName={displayName}
             message={subscriptionModalMessage}
-            onUpgradePress={handleSubscription}
-            onClose={() => setSubscriptionModalVisible(false)}
+            onUpgradePress={handleSubscriptionUpgrade}
+            onClose={() => {
+              setSubscriptionModalVisible(false);
+              if (profileAccessBlocked) {
+                navigation.goBack();
+              }
+            }}
+          />
+
+          <AwesomeAlert
+            show={interestAlertState.show}
+            showProgress={false}
+            title={interestAlertState.title}
+            message={interestAlertState.message}
+            closeOnTouchOutside
+            closeOnHardwareBackPress={false}
+            showCancelButton
+            showConfirmButton
+            cancelText={interestAlertState.cancelText}
+            confirmText={interestAlertState.confirmText}
+            confirmButtonColor={COLORS.primary}
+            onCancelPressed={dismissInterestAlert}
+            onConfirmPressed={interestAlertState.onConfirm}
+            titleStyle={{ fontSize: 18, fontWeight: 'bold' }}
+            messageStyle={{ fontSize: 14, textAlign: 'center' }}
           />
         </ScrollView>
 
@@ -1456,7 +1383,15 @@ const ProfileDetailScreen = ({ route, navigation }) => {
                     : 'star-o'
                 }
                 size={22}
-                color={COLORS.primary}
+                color={
+                  isInterestAccepted
+                    ? COLORS.primary
+                    : isInterestReceived
+                      ? COLORS.accent
+                      : isInterestSent
+                        ? '#00BFFF'
+                        : COLORS.primary
+                }
               />
             </View>
             <Text style={styles.iconText}>Interest</Text>
@@ -1731,6 +1666,47 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: 'right',
   },
+  aboutMeContainer: {
+    marginTop: SIZES.base,
+    paddingTop: SIZES.base,
+
+  },
+  aboutMeTitle: {
+    ...FONTS.body4,
+    fontWeight: '600',
+    color: COLORS.darkGray,
+    marginBottom: 6,
+  },
+  aboutMeText: {
+    ...FONTS.body4,
+    color: COLORS.dark,
+    lineHeight: 20,
+  },
+  partnerPreferenceWarningBox: {
+    borderWidth: 1,
+    borderColor: '#f5cf6a',
+    backgroundColor: '#fff8e7',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  partnerPreferenceWarningText: {
+    ...FONTS.body4,
+    color: '#8a5a00',
+    marginBottom: 10,
+  },
+  partnerPreferenceWarningButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  partnerPreferenceWarningButtonText: {
+    ...FONTS.body5,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
   errorText: { color: COLORS.red, ...FONTS.body3 },
   scrollViewContent: { paddingBottom: 130 },
 
@@ -1871,12 +1847,84 @@ const styles = StyleSheet.create({
     color: COLORS.dark,
     marginBottom: SIZES.base,
   },
+  unmatchedCriteriaTitle: {
+    ...FONTS.h3,
+    color: COLORS.dark,
+    marginBottom: SIZES.base,
+  },
   matchedCriterion: {
     ...FONTS.body3,
     color: COLORS.darkGray,
     marginBottom: SIZES.base / 2,
   },
+  unmatchedCriterion: {
+    ...FONTS.body3,
+    color: COLORS.primary,
+    marginBottom: SIZES.base / 2,
+  },
+
+  // ── Criteria chip grid ────────────────────────────────────────
+  criteriaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: SIZES.base,
+  },
+  criteriaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    maxWidth: '48%',
+  },
+  criteriaChipUnmatched: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  criteriaChipTextMatched: {
+    fontSize: 12,
+    color: '#15803d',
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  criteriaChipTextUnmatched: {
+    fontSize: 12,
+    color: '#b91c1c',
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+
+  // ── Two-column criteria layout ────────────────────────────────
+  criteriaColumns: {
+    flexDirection: 'row',
+    marginTop: 14,
+  },
+  criteriaCol: {
+    flex: 1,
+    paddingHorizontal: 4,
+  },
+  criteriaColTitle: {
+    ...FONTS.h4,
+    color: COLORS.dark,
+    marginBottom: 6,
+  },
+  criteriaColItem: {
+    ...FONTS.body4,
+    color: COLORS.darkGray,
+    paddingVertical: 2,
+  },
+  criteriaDivider: {
+    width: 1,
+    backgroundColor: '#e5e7eb',
+    marginHorizontal: 8,
+  },
 });
+
+
 
 export default ProfileDetailScreen;
 // end file marker

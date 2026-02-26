@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import CustomHeader from '../components/CustomHeader';
 import DataRequestModal from '../components/DataRequestModal';
 import SuccessPopup from '../components/SuccessPopup';
 import { getImageUrl } from '../utils/imageUtils';
+import { LanguageContext } from '../contexts/LanguageContext';
 
 import { API_BASE_URL } from '../constants/config';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
@@ -36,6 +37,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const API_URL = `${API_BASE_URL}/api/user`;
 const META_API_BASE_URL = `${API_BASE_URL}/api/meta`;
 const ABOUT_ME_MAX = 500;
+const MAX_UPLOAD_SIZE_MB = 5;
+const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+];
 
 // --- Options Constants (Copied/Aligned with Register) ---
 const PROFILE_FOR_OPTIONS = [
@@ -148,7 +159,7 @@ const CustomPicker = ({
         // Since it is a nested component, we might not have it unless passed.
         // EditProfileScreen passes 'onDisabledPress' explicitly for dependent fields.
         // For general disabled fields (like Gender/ProfileFor), we should pass onDisabledPress prop from parent.
-        Alert.alert("Notice", disabledMessage); // Keeping fallback or refactor parent to pass handler.
+        Alert.alert(i18n.t('common.notice'), disabledMessage); // Keeping fallback or refactor parent to pass handler.
       }
       return;
     }
@@ -229,6 +240,7 @@ const CustomPicker = ({
 const EditProfileScreen = ({ navigation }) => {
   const { user } = useSelector(state => state.auth);
   const dispatch = useDispatch();
+  const { language } = useContext(LanguageContext);
 
   // --- STATE DEFINITIONS (All Hooks at Top) ---
   const [loading, setLoading] = useState(false);
@@ -297,17 +309,18 @@ const EditProfileScreen = ({ navigation }) => {
   maxDob.setFullYear(maxDob.getFullYear() - 18);
 
   // 8. Photos & IDs
-  // Initialize with existing photos, ensuring user.image is first (Main Profile Pic)
-  const [profilePhotos, setProfilePhotos] = useState(() => {
-    const photos = [];
-    if (user?.image) photos.push(user.image);
+  const [profileImage, setProfileImage] = useState(user?.image || null);
+  const [featurePhotos, setFeaturePhotos] = useState(() => {
+    const photos = Array(6).fill(null);
     if (user?.photos && Array.isArray(user.photos)) {
-      // Filter out duplicates if needed, or just append
-      const others = user.photos.filter(p => p !== user.image);
-      photos.push(...others);
+      const others = user.photos.filter(p => p !== user?.image).slice(0, 6);
+      others.forEach((p, idx) => {
+        photos[idx] = p;
+      });
     }
-    return photos.slice(0, 6);
+    return photos;
   });
+  const [imageMetaByUri, setImageMetaByUri] = useState({});
   const [aadharFront, setAadharFront] = useState(user?.aadharFront || null);
   const [aadharBack, setAadharBack] = useState(user?.aadharBack || null);
   const [panFront, setPanFront] = useState(user?.panFront || null);
@@ -379,20 +392,20 @@ const EditProfileScreen = ({ navigation }) => {
         name,
         parentType,
         parentId
-      }, config);
+      }, { ...config, suppressGlobalError: true });
       if (res.data.success) {
         setSuccessPopup({
           visible: true,
-          title: "Request Submitted",
-          message: `Your request to add ${type} "${name}" has been submitted. It will appear in the list after admin approval.`,
+          title: i18n.t('register.dataRequest.submittedTitle', { lng: language }),
+          message: i18n.t('register.dataRequest.submittedMessage', { type, name, lng: language }),
           type: 'success'
         });
       }
     } catch (err) {
-      const msg = err.response?.data?.message || "Request failed";
+      const msg = err.response?.data?.message || i18n.t('register.dataRequest.failedMessage', { lng: language });
       setSuccessPopup({
         visible: true,
-        title: "Error",
+        title: i18n.t('common.error', { lng: language }),
         message: msg,
         type: 'error'
       });
@@ -430,12 +443,15 @@ const EditProfileScreen = ({ navigation }) => {
       setLoadingMeta(true);
       try {
         // 1. Fetch Meta
-        const metaRes = await axios.get(`${META_API_BASE_URL}/profile-meta`);
+        const metaRes = await axios.get(`${META_API_BASE_URL}/profile-meta`, {
+          suppressGlobalError: true,
+        });
         setAllMetaData(metaRes.data);
 
         // 2. Fetch User Profile (Fresh)
         const token = await AsyncStorage.getItem('token');
         const userRes = await axios.get(`${API_BASE_URL}/api/user/singleuser`, {
+          suppressGlobalError: true,
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -489,21 +505,15 @@ const EditProfileScreen = ({ navigation }) => {
           setContactVisibility(u.privacy?.contactVisibility || 'public');
 
           // Photos
-          const photos = new Array(6).fill(null);
-          // Slot 0: Main Image
-          if (u.image) photos[0] = u.image;
-
-          let nextSlot = 1;
+          setProfileImage(u.image || null);
+          const photos = Array(6).fill(null);
           if (u.photos && Array.isArray(u.photos)) {
-            const others = u.photos.filter(p => p !== u.image);
-            others.forEach(p => {
-              if (nextSlot < 6) {
-                photos[nextSlot] = p;
-                nextSlot++;
-              }
+            const others = u.photos.filter(p => p !== u.image).slice(0, 6);
+            others.forEach((p, idx) => {
+              photos[idx] = p;
             });
           }
-          setProfilePhotos(photos);
+          setFeaturePhotos(photos);
 
 
           // Initialize IDs ensuring array access using optional chaining
@@ -548,19 +558,111 @@ const EditProfileScreen = ({ navigation }) => {
   }, [allMetaData.gotras, selectedSubCaste]);
 
   // --- IMAGE HELPERS ---
+  const getImageValidationMessage = (asset) => {
+    if (!asset) return i18n.t('register.validationtext.imagePickFailed', { lng: language });
+    if (asset.type && !ALLOWED_IMAGE_MIME_TYPES.includes(asset.type)) {
+      return i18n.t('register.validationtext.invalidImageType', { lng: language });
+    }
+    if (asset.fileSize && asset.fileSize > MAX_UPLOAD_SIZE_BYTES) {
+      return i18n.t('register.validationtext.imageTooLarge', {
+        size: MAX_UPLOAD_SIZE_MB,
+        lng: language
+      });
+    }
+    if (!asset.uri) {
+      return i18n.t('register.validationtext.imagePickFailed', { lng: language });
+    }
+    return '';
+  };
+
+  const getAssetSizeBytes = async (asset) => {
+    if (!asset) return 0;
+    if (Number(asset.fileSize) > 0) return Number(asset.fileSize);
+    if (!asset.uri) return 0;
+
+    try {
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      return Number(blob?.size || 0);
+    } catch (e) {
+      return 0;
+    }
+  };
+
+  const rememberImageMeta = (asset) => {
+    if (!asset?.uri) return;
+    setImageMetaByUri(prev => ({
+      ...prev,
+      [asset.uri]: {
+        fileSize: Number(asset.fileSize || 0),
+        type: asset.type || '',
+      },
+    }));
+  };
+
+  const hasOversizeSelectedImages = () => {
+    const selectedUris = [
+      profileImage,
+      aadharFront,
+      aadharBack,
+      panFront,
+      panBack,
+      ...(Array.isArray(featurePhotos) ? featurePhotos : []),
+    ].filter(Boolean);
+
+    return selectedUris.some((uri) => {
+      const meta = imageMetaByUri[uri];
+      return meta?.fileSize > MAX_UPLOAD_SIZE_BYTES;
+    });
+  };
+
   const pickPhoto = async (setter, multiple = false, targetIndex = -1) => {
     try {
       const result = await launchImageLibrary({
         mediaType: 'photo',
         selectionLimit: (multiple && targetIndex === -1) ? 6 : 1,
-        quality: 0.8
+        quality: 1,
+        includeExtra: true,
       });
+      if (result.didCancel) return;
+      if (result.errorCode) {
+        setSuccessPopup({
+          visible: true,
+          title: i18n.t('register.validation', { lng: language }),
+          message: i18n.t('register.validationtext.imagePickFailed', { lng: language }),
+          type: 'error'
+        });
+        return;
+      }
       if (result.assets && result.assets.length > 0) {
+        const validAssets = [];
+        for (const asset of result.assets) {
+          const resolvedSize = await getAssetSizeBytes(asset);
+          const validatedAsset = {
+            ...asset,
+            fileSize: resolvedSize || asset.fileSize,
+          };
+          const imageValidationMessage = getImageValidationMessage(validatedAsset);
+          if (imageValidationMessage) {
+            setSuccessPopup({
+              visible: true,
+              title: i18n.t('register.validation', { lng: language }),
+              message: imageValidationMessage,
+              type: 'error'
+            });
+            continue;
+          }
+          rememberImageMeta(validatedAsset);
+          validAssets.push(validatedAsset);
+        }
+        if (validAssets.length === 0) return;
+
         if (multiple) {
           setter(prev => {
-            const copy = Array.isArray(prev) ? [...prev] : Array(6).fill(null);
-            while (copy.length < 6) copy.push(null);
-            const uris = result.assets.map(a => a.uri);
+            const copy = Array.isArray(prev) ? [...prev] : [];
+            const minSlots = Array.isArray(prev) ? prev.length : (targetIndex + 1);
+            while (copy.length < Math.max(1, minSlots)) copy.push(null);
+            const uris = validAssets.map(a => a.uri);
 
             if (targetIndex !== -1) {
               // Targeted update: strict assignment to specific slot
@@ -568,7 +670,7 @@ const EditProfileScreen = ({ navigation }) => {
             } else {
               // Fill empty slots (fallback or generic add)
               let uriIndex = 0;
-              for (let i = 0; i < 6 && uriIndex < uris.length; i++) {
+              for (let i = 0; i < copy.length && uriIndex < uris.length; i++) {
                 if (!copy[i]) {
                   copy[i] = uris[uriIndex];
                   uriIndex++;
@@ -580,7 +682,7 @@ const EditProfileScreen = ({ navigation }) => {
         } else {
           // Single setter (legacy) - used for ID cards
           if (typeof setter === 'function') {
-            setter(result.assets[0].uri);
+            setter(validAssets[0].uri);
           }
         }
       }
@@ -588,74 +690,30 @@ const EditProfileScreen = ({ navigation }) => {
   };
 
   const removeGalleryPhoto = (index) => {
-    // Replace with null to keep grid structure if needed, 
-    // BUT the user wants "jo remove karunga usi position ka remove ho".
-    // If we want to maintain the "slot", we should set it to null.
-    // However, the rendering logic iterates [0..5] and checks profilePhotos[index].
-    // If profilePhotos is ["A", "B"], index 0 is A, index 1 is B.
-    // If i remove A, array becomes ["B"]. Index 0 is now B.
-    // The user likely wants to keep empty slots.
-
-    const newPhotos = [...profilePhotos];
-    // If array length is less than 6, we might not have 'slots'.
-    // To support "fixed slots", profilePhotos should be length 6 with nulls.
-
-    // Let's ensure profilePhotos behaves like fixed slots for the UI.
-    // If we just restart the array with nulls, we can achieve this.
-    // The current state might be just valid photos.
-
-    // The previous logic was: newPhotos.splice(index, 1);
-    // This shifts elements.
-
-    // New Logic: 
-    // IF the user wants valid photos to shift, then splice is correct.
-    // BUT user says "usi position ka remove ho", implying they don't want others to shift?
-    // OR they mean "I clicked X on the 2nd photo, but the 3rd one disappeared"?
-    // The current mapping is map((_, index) => profilePhotos[index]).
-    // If profilePhotos = [A, B, C] and we view 6 slots.
-    // Slot 0 shows A. Slot 1 shows B. Slot 2 shows C.
-    // User clicks X on Slot 1 (B).
-    // splice(1, 1) -> [A, C].
-    // Re-render: Slot 0 shows A. Slot 1 shows C. Slot 2 is empty.
-    // It DOES shift C into Slot 1.
-    // If the USER does NOT want shift, we must use nulls.
-    // BUT our backend expects a list of photos.
-    // We can handle nulls in UI and filter them out before save.
-
-    // Let's changing state to strictly fixed 6-sized array?
-    // Or just assign null/undefined at that index if we want it empty.
-    if (index < newPhotos.length) {
-      newPhotos[index] = null; // Mark as empty
-      // We might need to filter 'null's out during SAVE, or keep them to maintain order?
-      // Usually backend just takes a list.
-      // Let's filter empties only on SAVE.
-
-      // BUT wait, if we have [A, null, C].
-      // The rendering loop uses `profilePhotos[index]`.
-      // Index 0: A. Index 1: null -> shows (+) button. Index 2: C.
-      // This matches "usi position ka remove ho".
-      setProfilePhotos(newPhotos);
-
-      // If removing the main profile image (index 0), update Redux immediately
-      // so drawer sidebar syncs
-      if (index === 0) {
-        // Find the next available photo to use as main image
-        const nextPhoto = newPhotos.find((p, i) => i > 0 && p !== null);
-        const validPhotos = newPhotos.filter(p => p !== null);
-
-        // Update Redux store with new image AND photos to prevent fallback to deleted image
-        dispatch(updateUserData({
-          ...user,
-          image: nextPhoto || null, // Use next photo or null if none available
-          photos: validPhotos // Update photos list so drawer helper doesn't find old photo
-        }));
+    setFeaturePhotos(prev => {
+      const next = [...prev];
+      if (index < next.length) {
+        next[index] = null;
       }
-    }
+      return next;
+    });
   };
 
   // --- SAVE HANDLER ---
   const handleSave = async () => {
     if (!validateForm()) return;
+    if (hasOversizeSelectedImages()) {
+      setSuccessPopup({
+        visible: true,
+        title: i18n.t('register.validation', { lng: language }),
+        message: i18n.t('register.validationtext.imageTooLarge', {
+          size: MAX_UPLOAD_SIZE_MB,
+          lng: language
+        }),
+        type: 'error'
+      });
+      return;
+    }
 
     setLoading(true);
 
@@ -664,8 +722,8 @@ const EditProfileScreen = ({ navigation }) => {
 
       // Basic
       formData.append('fullName', fullName);
-      formData.append('email', email);
-      formData.append('phoneNumber', phoneNumber);
+      if (email?.trim()) formData.append('email', email.trim());
+      if (phoneNumber?.trim()) formData.append('phoneNumber', phoneNumber.trim());
       formData.append('profileFor', profileFor);
       formData.append('gender', gender);
       formData.append('dateOfBirth', dateOfBirth.toISOString()); // or split T
@@ -707,28 +765,23 @@ const EditProfileScreen = ({ navigation }) => {
 
       // Photos Handling
       const existingPhotos = [];
-      profilePhotos.forEach((p, i) => {
-        // Check if it is a new file (local URI)
-        const isNewFile = p && (p.startsWith('file:') || p.startsWith('content:'));
+      const isMainNewFile =
+        profileImage &&
+        (profileImage.startsWith('file:') || profileImage.startsWith('content:'));
+      if (isMainNewFile) {
+        const name = `profile_${Date.now()}.jpg`;
+        formData.append('image', { uri: profileImage, name, type: 'image/jpeg' });
+      } else if (profileImage) {
+        formData.append('mainImage', profileImage);
+      }
 
-        if (i === 0) {
-          // Main Profile Picture
-          if (isNewFile) {
-            const name = `profile_${Date.now()}.jpg`;
-            formData.append('image', { uri: p, name, type: 'image/jpeg' });
-          } else if (p) {
-            // Existing main image (string path)
-            formData.append('mainImage', p);
-          }
-        } else {
-          // Gallery Photos
-          if (isNewFile) {
-            const name = `photo_${i}_${Date.now()}.jpg`;
-            formData.append('photos', { uri: p, name, type: 'image/jpeg' });
-          } else if (p) {
-            // Add to existing photos list
-            existingPhotos.push(p);
-          }
+      featurePhotos.forEach((p, i) => {
+        const isNewFile = p && (p.startsWith('file:') || p.startsWith('content:'));
+        if (isNewFile) {
+          const name = `photo_${i}_${Date.now()}.jpg`;
+          formData.append('photos', { uri: p, name, type: 'image/jpeg' });
+        } else if (p) {
+          existingPhotos.push(p);
         }
       });
       // Append existing photos as array/individual fields
@@ -754,6 +807,7 @@ const EditProfileScreen = ({ navigation }) => {
 
       const token = await AsyncStorage.getItem('token');
       const res = await axios.put(`${API_URL}/${user._id}`, formData, {
+        suppressGlobalError: true,
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`
@@ -768,8 +822,8 @@ const EditProfileScreen = ({ navigation }) => {
       setLoading(false);
       setSuccessPopup({
         visible: true,
-        title: "Success",
-        message: "Profile updated successfully!",
+        title: i18n.t('common.success', { lng: language }),
+        message: i18n.t('editProfile.alerts.profileUpdated', { lng: language }),
         type: 'success'
       });
       // Delay navigation slightly to let user see success? Or just navigate.
@@ -786,11 +840,22 @@ const EditProfileScreen = ({ navigation }) => {
 
     } catch (e) {
       setLoading(false);
-      // console.error(e);
+      const status = e?.response?.status;
+      const errorCode = e?.response?.data?.code;
+      let message = e?.response?.data?.message || i18n.t('editProfile.alerts.saveFailed', { lng: language });
+      if (errorCode === 'FILE_TOO_LARGE') {
+        message = i18n.t('register.validationtext.imageTooLarge', {
+          size: MAX_UPLOAD_SIZE_MB,
+          lng: language
+        });
+      }
+      if (!status || status >= 500) {
+        message = i18n.t('register.validationtext.serverIssue', { lng: language });
+      }
       setSuccessPopup({
         visible: true,
-        title: i18n.t('common.error'),
-        message: e.response?.data?.message || "Failed to update profile",
+        title: i18n.t('common.error', { lng: language }),
+        message,
         type: 'error'
       });
     }
@@ -801,23 +866,25 @@ const EditProfileScreen = ({ navigation }) => {
     const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
     // --- Page 1 Checks ---
-    if (!fullName) missingFields.push("Full Name");
-    if (!email) missingFields.push("Email");
-    else if (!isValidEmail(email)) missingFields.push("Valid Email");
+    if (!fullName) missingFields.push(i18n.t('register.labels.fullName', { lng: language }));
+    if (email && !isValidEmail(email)) {
+      missingFields.push(i18n.t('register.validationtext.validEmail', { lng: language }));
+    }
 
-    if (!phoneNumber) missingFields.push("Phone Number");
-    else if (phoneNumber.replace(/[^0-9]/g, '').length < 10) missingFields.push("Valid Phone Number (10 digits)");
+    if (phoneNumber && phoneNumber.replace(/[^0-9]/g, '').length < 10) {
+      missingFields.push(i18n.t('register.validationtext.validPhone', { lng: language }));
+    }
 
     // --- Page 2 Checks ---
-    if (!gender) missingFields.push("Gender");
-    if (!profileFor) missingFields.push("Profile For");
-    if (!maritalStatus) missingFields.push("Marital Status");
-    if (!manglik) missingFields.push("Manglik");
-    if (!dateOfBirth) missingFields.push("Date of Birth");
-    if (!height) missingFields.push("Height");
+    if (!gender) missingFields.push(i18n.t('register.labels.gender', { lng: language }));
+    if (!profileFor) missingFields.push(i18n.t('register.labels.profileFor', { lng: language }));
+    if (!maritalStatus) missingFields.push(i18n.t('register.labels.maritalStatus', { lng: language }));
+    if (!manglik) missingFields.push(i18n.t('register.labels.manglik', { lng: language }));
+    if (!dateOfBirth) missingFields.push(i18n.t('register.labels.dob', { lng: language }));
+    if (!height) missingFields.push(i18n.t('register.labels.height', { lng: language }));
 
     if (maritalStatus !== 'Never Married' && (!children || children === '0')) {
-      missingFields.push("Children");
+      missingFields.push(i18n.t('register.labels.children', { lng: language }));
     }
 
     // Age Check
@@ -828,46 +895,75 @@ const EditProfileScreen = ({ navigation }) => {
     const isUnder18 = age < 18 || (age === 18 && month < 0) || (age === 18 && month === 0 && today.getDate() < dob.getDate());
 
     if (isUnder18) {
-      Alert.alert("Age Restriction", "You must be at least 18 years old to register.");
+      setSuccessPopup({
+        visible: true,
+        title: i18n.t('register.ageRequirement', { lng: language }),
+        message: i18n.t('register.ageError', { lng: language }),
+        type: 'error'
+      });
       return false;
     }
 
     // --- Page 3 Checks ---
-    if (!selectedReligion) missingFields.push("Religion");
-    if (!selectedCaste) missingFields.push("Caste");
-    if (!selectedMotherTongue) missingFields.push("Mother Tongue");
-    if (!selectedProfession) missingFields.push("Profession");
-    if (!selectedLocation) missingFields.push("Location");
-    if (!selectedEducation || selectedEducation.length === 0) missingFields.push("Education");
+    if (!selectedReligion) missingFields.push(i18n.t('register.labels.religion', { lng: language }));
+    if (!selectedCaste) missingFields.push(i18n.t('register.labels.caste', { lng: language }));
+    if (!selectedMotherTongue) missingFields.push(i18n.t('register.labels.motherTongue', { lng: language }));
+    if (!selectedProfession) missingFields.push(i18n.t('register.labels.profession', { lng: language }));
+    if (!selectedLocation) missingFields.push(i18n.t('register.labels.location', { lng: language }));
+    if (!selectedEducation || selectedEducation.length === 0) missingFields.push(i18n.t('register.labels.education', { lng: language }));
 
     // --- Photo Checks ---
-    if (profilePhotos.length < 3) {
-      Alert.alert("Validation Error", "Please upload at least 3 profile photos.");
+    if (!profileImage) {
+      setSuccessPopup({
+        visible: true,
+        title: i18n.t('register.validation', { lng: language }),
+        message: i18n.t('register.validationtext.mainPhotoRequired', { lng: language }),
+        type: 'error'
+      });
+      return false;
+    }
+
+    const totalPhotos = (profileImage ? 1 : 0) + featurePhotos.filter(Boolean).length;
+    if (totalPhotos < 3) {
+      setSuccessPopup({
+        visible: true,
+        title: i18n.t('register.validation', { lng: language }),
+        message: i18n.t('register.validationtext.minPhotosRequired', { lng: language }),
+        type: 'error'
+      });
       return false;
     }
 
     // --- ID Checks ---
     if (!aadharFront || !aadharBack) {
-      Alert.alert("Validation Error", "Please upload both front and back sides of Aadhar Card.");
+      setSuccessPopup({
+        visible: true,
+        title: i18n.t('register.validation', { lng: language }),
+        message: i18n.t('register.validationtext.aadharRequired', { lng: language }),
+        type: 'error'
+      });
       return false;
     }
 
     // --- Family & Lifestyle Checks ---
-    if (!fatherStatus) missingFields.push("Father Status");
-    if (!motherStatus) missingFields.push("Mother Status");
-    if (!brothers) missingFields.push("Brothers");
-    if (!sisters) missingFields.push("Sisters");
-    if (!familyType) missingFields.push("Family Type");
-    if (!familyValues) missingFields.push("Family Values");
-    if (!diet) missingFields.push("Diet");
-    if (!annualIncome) missingFields.push("Annual Income");
-    if (!aboutMe) missingFields.push("About Me");
+    if (!fatherStatus) missingFields.push(i18n.t('register.labels.fatherStatus', { lng: language }));
+    if (!motherStatus) missingFields.push(i18n.t('register.labels.motherStatus', { lng: language }));
+    if (!brothers) missingFields.push(i18n.t('register.labels.brothers', { lng: language }));
+    if (!sisters) missingFields.push(i18n.t('register.labels.sisters', { lng: language }));
+    if (!familyType) missingFields.push(i18n.t('register.labels.familyType', { lng: language }));
+    if (!familyValues) missingFields.push(i18n.t('register.labels.familyValues', { lng: language }));
+    if (!diet) missingFields.push(i18n.t('register.labels.diet', { lng: language }));
+    if (!annualIncome) missingFields.push(i18n.t('register.labels.income', { lng: language }));
+    if (!aboutMe) missingFields.push(i18n.t('register.labels.about', { lng: language }));
 
     if (missingFields.length > 0) {
       setSuccessPopup({
         visible: true,
-        title: "Missing Details",
-        message: `Please fill the following required details:\n\n${missingFields.join(', ')}`,
+        title: i18n.t('register.validation', { lng: language }),
+        message: i18n.t('register.validationtext.requiredDetails', {
+          fields: missingFields.join(', '),
+          lng: language
+        }),
         type: 'error'
       });
       return false;
@@ -898,12 +994,35 @@ const EditProfileScreen = ({ navigation }) => {
 
             {/* --- PHOTOS SECTION (Register Style) --- */}
             <View style={styles.sectionBlock}>
-              <Text style={styles.sectionTitle}>Profile Photos <Text style={{ color: COLORS.primary }}>*</Text></Text>
-              <Text style={styles.sectionSub}>Required minimum 3 images with clear face.</Text>
+              <Text style={styles.sectionTitle}>{i18n.t('register.photoSection.mainProfile', { lng: language })} <Text style={{ color: COLORS.primary }}>*</Text></Text>
+              <Text style={styles.sectionSub}>{i18n.t('register.validationtext.mainPhotoRequired', { lng: language })}</Text>
+              <Text style={styles.sectionSub}>{i18n.t('register.photoSection.imageSizeHint', { size: MAX_UPLOAD_SIZE_MB, lng: language })}</Text>
+
+              <View style={styles.photoGrid}>
+                <View style={styles.photoBox}>
+                  {profileImage ? (
+                    <>
+                      <Image source={{ uri: getImageUrl(profileImage) }} style={styles.photoImg} resizeMode="cover" />
+                      <TouchableOpacity style={styles.removeBtn} onPress={() => setProfileImage(null)}>
+                        <Icon name="close" size={12} color="#fff" />
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity style={styles.addPhotoBtn} onPress={() => pickPhoto(setProfileImage)}>
+                      <Icon name="add" size={30} color={COLORS.gray} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.sectionBlock}>
+              <Text style={styles.sectionTitle}>{i18n.t('register.labels.datingCardPhoto', { lng: language })} <Text style={{ color: COLORS.primary }}>*</Text></Text>
+              <Text style={styles.sectionSub}>{i18n.t('register.photoSection.requiredMin', { lng: language })}</Text>
 
               <View style={styles.photoGrid}>
                 {[...Array(6)].map((_, index) => {
-                  const photoUri = profilePhotos[index];
+                  const photoUri = featurePhotos[index];
                   return (
                     <View key={index} style={styles.photoBox}>
                       {photoUri ? (
@@ -914,14 +1033,15 @@ const EditProfileScreen = ({ navigation }) => {
                           </TouchableOpacity>
                           {index === 0 && (
                             <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 2 }}>
-                              <Text style={{ color: '#fff', fontSize: 10, textAlign: 'center', fontWeight: 'bold' }}>Main Profile</Text>
+                              <Text style={{ color: '#fff', fontSize: 10, textAlign: 'center', fontWeight: 'bold' }}>
+                                {i18n.t('register.photoSection.mainImage', { lng: language })}
+                              </Text>
                             </View>
                           )}
                         </>
                       ) : (
-                        <TouchableOpacity style={styles.addPhotoBtn} onPress={() => pickPhoto(setProfilePhotos, true, index)}>
+                        <TouchableOpacity style={styles.addPhotoBtn} onPress={() => pickPhoto(setFeaturePhotos, true, index)}>
                           <Icon name="add" size={30} color={COLORS.gray} />
-                          {index === 0 && <Text style={{ fontSize: 10, color: COLORS.gray, marginTop: 4 }}>Main Pic</Text>}
                         </TouchableOpacity>
                       )}
                     </View>
@@ -931,27 +1051,26 @@ const EditProfileScreen = ({ navigation }) => {
             </View>
 
             {/* --- BASIC INFO --- */}
-            <Text style={styles.sectionHeader}>Basic Info</Text>
+            <Text style={styles.sectionHeader}>{i18n.t('editProfile.sections.basic', { lng: language })}</Text>
 
-            <FloatingLabelInput label="Full Name" value={fullName} onChangeText={setFullName} required />
-            <FloatingLabelInput label="Email" value={email} onChangeText={setEmail} required />
+            <FloatingLabelInput label={i18n.t('register.labels.fullName', { lng: language })} value={fullName} onChangeText={setFullName} required />
+            <FloatingLabelInput label={i18n.t('register.labels.email', { lng: language })} value={email} onChangeText={setEmail} />
             <FloatingLabelInput
-              label="Phone"
+              label={i18n.t('auth.phone', { lng: language })}
               value={phoneNumber}
               onChangeText={text => setPhoneNumber(text.replace(/[^0-9]/g, '').slice(0, 10))}
-              required
               keyboardType="numeric"
             />
 
-            <CustomPicker label="Profile For" selectedValue={profileFor} onValueChange={setProfileFor} items={PROFILE_FOR_OPTIONS} disabled disabledMessage="Profile For cannot be changed." onDisabledPress={() => setSuccessPopup({ visible: true, title: "Notice", message: "Profile For cannot be changed.", type: 'info' })} />
-            <CustomPicker label="Gender" selectedValue={gender} onValueChange={setGender} items={GENDER_OPTIONS} disabled disabledMessage="Gender cannot be changed." onDisabledPress={() => setSuccessPopup({ visible: true, title: "Notice", message: "Gender cannot be changed.", type: 'info' })} />
+            <CustomPicker label={i18n.t('register.labels.profileFor', { lng: language })} selectedValue={profileFor} onValueChange={setProfileFor} items={PROFILE_FOR_OPTIONS} disabled disabledMessage={i18n.t('register.labels.profileFor', { lng: language })} onDisabledPress={() => setSuccessPopup({ visible: true, title: i18n.t('common.notice', { lng: language }), message: `${i18n.t('register.labels.profileFor', { lng: language })} cannot be changed.`, type: 'info' })} />
+            <CustomPicker label={i18n.t('register.labels.gender', { lng: language })} selectedValue={gender} onValueChange={setGender} items={GENDER_OPTIONS} disabled disabledMessage={i18n.t('register.labels.gender', { lng: language })} onDisabledPress={() => setSuccessPopup({ visible: true, title: i18n.t('common.notice', { lng: language }), message: `${i18n.t('register.labels.gender', { lng: language })} cannot be changed.`, type: 'info' })} />
 
 
 
             {/* Date of Birth */}
             <View style={{ marginVertical: 10, minHeight: 55 }}>
               <TouchableOpacity
-                onPress={() => setSuccessPopup({ visible: true, title: "Notice", message: "Date of Birth cannot be changed.", type: 'info' })}
+                onPress={() => setSuccessPopup({ visible: true, title: i18n.t('common.notice', { lng: language }), message: `${i18n.t('register.labels.dob', { lng: language })} cannot be changed.`, type: 'info' })}
                 activeOpacity={1}
                 style={[
                   {
@@ -978,7 +1097,7 @@ const EditProfileScreen = ({ navigation }) => {
                     fontFamily: FONTS.body3.fontFamily,
                     flexDirection: 'row',
                   }}>
-                    Date of Birth
+                    {i18n.t('register.labels.dob', { lng: language })}
                   </Text>
 
                   {/* Value */}
@@ -988,7 +1107,7 @@ const EditProfileScreen = ({ navigation }) => {
                       color: dateOfBirth ? COLORS.black : COLORS.gray,
                       fontFamily: FONTS.body3.fontFamily,
                     }} numberOfLines={1}>
-                      {dateOfBirth ? dateOfBirth.toDateString() : "Select Date"}
+                      {dateOfBirth ? dateOfBirth.toDateString() : i18n.t('register.placeholders.selectDate', { lng: language })}
                     </Text>
                   </View>
 
@@ -1010,11 +1129,11 @@ const EditProfileScreen = ({ navigation }) => {
               />
             )}
 
-            <CustomPicker label="Height" selectedValue={height} onValueChange={setHeight} items={HEIGHT_OPTIONS} required searchable />
+            <CustomPicker label={i18n.t('register.labels.height', { lng: language })} selectedValue={height} onValueChange={setHeight} items={HEIGHT_OPTIONS} required searchable />
 
             {/* --- PERSONAL --- */}
             <CustomPicker
-              label="Marital Status"
+              label={i18n.t('register.labels.maritalStatus', { lng: language })}
               selectedValue={maritalStatus}
               onValueChange={setMaritalStatus}
               items={[
@@ -1022,12 +1141,13 @@ const EditProfileScreen = ({ navigation }) => {
                 { name: 'Divorced', value: 'Divorced' },
                 { name: 'Widowed', value: 'Widowed' }
               ]}
+              placeholder={i18n.t('register.placeholders.selectMaritalStatus', { lng: language })}
               required
             />
 
             {maritalStatus !== 'Never Married' && (
               <CustomPicker
-                label="Children"
+                label={i18n.t('register.labels.children', { lng: language })}
                 selectedValue={children}
                 onValueChange={setChildren}
                 items={[
@@ -1037,15 +1157,16 @@ const EditProfileScreen = ({ navigation }) => {
                   { name: '3+ Children', value: '3+ Children' },
                   { name: 'Prefer not to say', value: 'Prefer not to say' }
                 ]}
+                placeholder={i18n.t('register.placeholders.selectChildren', { lng: language })}
               />
             )}
 
-            <FloatingLabelInput label="About Me" value={aboutMe} onChangeText={setAboutMe} multiline containerStyle={{ height: 100 }} required maxLength={ABOUT_ME_MAX} />
+            <FloatingLabelInput label={i18n.t('register.labels.about', { lng: language })} value={aboutMe} onChangeText={setAboutMe} multiline containerStyle={{ height: 100 }} required maxLength={ABOUT_ME_MAX} />
 
             {/* --- RELIGION --- */}
-            <Text style={styles.sectionHeader}>Religious & Social</Text>
+            <Text style={styles.sectionHeader}>{i18n.t('editProfile.sections.background', { lng: language })}</Text>
             <CustomPicker
-              label="Religion"
+              label={i18n.t('register.labels.religion', { lng: language })}
               selectedValue={selectedReligion}
               onValueChange={handleReligionChange}
               items={(allMetaData.religions || []).map(item => ({
@@ -1053,10 +1174,11 @@ const EditProfileScreen = ({ navigation }) => {
                 name: item.name,
               }))}
               searchable
+              placeholder={i18n.t('register.placeholders.selectReligion', { lng: language })}
               required
             />
             <CustomPicker
-              label="Caste"
+              label={i18n.t('register.labels.caste', { lng: language })}
               selectedValue={selectedCaste}
               onValueChange={handleCasteChange}
               items={filteredCastes.map(item => ({
@@ -1064,18 +1186,19 @@ const EditProfileScreen = ({ navigation }) => {
                 name: item.name,
               }))}
               searchable
+              placeholder={i18n.t('register.placeholders.selectCaste', { lng: language })}
               required
               onRequestAdd={requestAddCaste}
               disabled={!selectedReligion}
               onDisabledPress={() => setSuccessPopup({
                 visible: true,
-                title: "Attention",
-                message: "Please select a Religion first.",
+                title: i18n.t('register.attention', { lng: language }),
+                message: i18n.t('register.validationtext.selectReligionFirst', { lng: language }),
                 type: 'info'
               })}
             />
             <CustomPicker
-              label="Sub Caste"
+              label={i18n.t('register.labels.subCaste', { lng: language })}
               selectedValue={selectedSubCaste}
               onValueChange={handleSubCasteChange}
               items={filteredSubCastes.map(item => ({
@@ -1083,17 +1206,18 @@ const EditProfileScreen = ({ navigation }) => {
                 name: item.name,
               }))}
               searchable
+              placeholder={i18n.t('register.placeholders.selectSubCasteOptional', { lng: language })}
               onRequestAdd={requestAddSubCaste}
               disabled={!selectedCaste}
               onDisabledPress={() => setSuccessPopup({
                 visible: true,
-                title: "Attention",
-                message: "Please select a Caste first.",
+                title: i18n.t('register.attention', { lng: language }),
+                message: i18n.t('register.validationtext.selectCasteFirst', { lng: language }),
                 type: 'info'
               })}
             />
             <CustomPicker
-              label="Gotra"
+              label={i18n.t('register.labels.gotra', { lng: language })}
               selectedValue={gotra}
               onValueChange={setGotra}
               items={filteredGotras.map(item => ({
@@ -1101,35 +1225,46 @@ const EditProfileScreen = ({ navigation }) => {
                 name: item.name,
               }))}
               searchable
+              placeholder={i18n.t('register.placeholders.selectGotraOptional', { lng: language })}
               onRequestAdd={requestAddGotra}
               disabled={!selectedSubCaste}
               onDisabledPress={() => setSuccessPopup({
                 visible: true,
-                title: "Attention",
-                message: "Please select a Sub Caste first.",
+                title: i18n.t('register.attention', { lng: language }),
+                message: i18n.t('register.validationtext.selectSubCasteFirst', { lng: language }),
                 type: 'info'
               })}
             />
-            <CustomPicker label="Manglik" selectedValue={manglik} onValueChange={setManglik} items={[{ name: 'Yes', value: 'Yes' }, { name: 'No', value: 'No' }, { name: 'Doesnt Matter', value: "Doesnt Matter" }]} />
+            <CustomPicker label={i18n.t('register.labels.manglik', { lng: language })} selectedValue={manglik} onValueChange={setManglik} items={[{ name: 'Yes', value: 'Yes' }, { name: 'No', value: 'No' }, { name: 'Doesnt Matter', value: "Doesnt Matter" }]} placeholder={i18n.t('register.placeholders.manglikQuestion', { lng: language })} />
 
-            <CustomPicker label="Mother Tongue" selectedValue={selectedMotherTongue} onValueChange={setSelectedMotherTongue} items={(allMetaData.motherTongues || []).map(item => ({ value: item._id, name: item.name }))} searchable required />
-            <CustomPicker label="Raasi" selectedValue={selectedRaasi} onValueChange={setSelectedRaasi} items={(allMetaData.raasis || []).map(item => ({ value: item._id, name: item.name }))} searchable />
+            <CustomPicker
+              label={`${i18n.t('register.labels.motherTongue', { lng: language })} *`}
+              selectedValue={selectedMotherTongue}
+              onValueChange={setSelectedMotherTongue}
+              items={(allMetaData.motherTongues || []).map(item => ({
+                value: item._id,
+                name: item.name
+              }))}
+              placeholder={i18n.t('register.placeholders.selectMotherTongue', { lng: language })}
+            />
+            <CustomPicker label={i18n.t('register.labels.raasi', { lng: language })} selectedValue={selectedRaasi} onValueChange={setSelectedRaasi} items={(allMetaData.raasis || []).map(item => ({ value: item._id, name: item.name }))} placeholder={i18n.t('register.placeholders.selectRaasiOptional', { lng: language })} searchable />
 
             {/* --- CAREER --- */}
-            <Text style={styles.sectionHeader}>Education & Career</Text>
-            <CustomPicker label="Education" selectedValue={selectedEducation} onValueChange={setSelectedEducation} items={(allMetaData.educations || []).map(item => ({ value: item._id, name: `${item.degree || ''} ${item.field ? `(${item.field})` : ''}` }))} searchable multiSelect />
-            <CustomPicker label="Profession" selectedValue={selectedProfession} onValueChange={setSelectedProfession} items={(allMetaData.professions || []).map(item => ({ value: item._id, name: `${item.occupation},${item.industry}` }))} searchable required />
-            <CustomPicker label="Location" selectedValue={selectedLocation} onValueChange={setSelectedLocation} items={(allMetaData.locations || []).map(item => ({ value: item._id, name: `${item.city}, ${item.state}, ${item.country}` }))} searchable required />
-            <FloatingLabelInput label="Annual Income" value={annualIncome} onChangeText={setAnnualIncome} keyboardType="numeric" />
+            <Text style={styles.sectionHeader}>{i18n.t('register.labels.income&about', { lng: language })}</Text>
+            <CustomPicker label={i18n.t('register.labels.education', { lng: language })} selectedValue={selectedEducation} onValueChange={setSelectedEducation} items={(allMetaData.educations || []).map(item => ({ value: item._id, name: `${item.degree || ''} ${item.field ? `(${item.field})` : ''}` }))} placeholder={i18n.t('register.placeholders.selectEducation', { lng: language })} searchable multiSelect />
+            <CustomPicker label={i18n.t('register.labels.profession', { lng: language })} selectedValue={selectedProfession} onValueChange={setSelectedProfession} items={(allMetaData.professions || []).map(item => ({ value: item._id, name: `${item.occupation},${item.industry}` }))} placeholder={i18n.t('register.placeholders.selectProfession', { lng: language })} searchable required />
+            <CustomPicker label={i18n.t('register.labels.location', { lng: language })} selectedValue={selectedLocation} onValueChange={setSelectedLocation} items={(allMetaData.locations || []).map(item => ({ value: item._id, name: `${item.city}, ${item.state}, ${item.country}` }))} placeholder={i18n.t('register.placeholders.selectCurrentLocation', { lng: language })} searchable required />
+            <FloatingLabelInput label={i18n.t('register.labels.income', { lng: language })} value={annualIncome} onChangeText={setAnnualIncome} keyboardType="numeric" />
 
             {/* --- ID VERIFICATION (Register Style) --- */}
             <View style={styles.sectionBlock}>
-              <Text style={styles.sectionTitle}>ID Verification</Text>
-              <Text style={styles.sectionSub}>Secure your profile with government ID.</Text>
+              <Text style={styles.sectionTitle}>{i18n.t('register.idVerification.title', { lng: language })}</Text>
+              <Text style={styles.sectionSub}>{i18n.t('register.idVerification.subtitle', { lng: language })}</Text>
+              <Text style={styles.sectionSub}>{i18n.t('register.idVerification.imageSizeHint', { size: MAX_UPLOAD_SIZE_MB, lng: language })}</Text>
 
               {/* Aadhar */}
               <View style={{ marginBottom: 15 }}>
-                <Text style={styles.idLabel}>Aadhar Card <Text style={{ color: COLORS.primary }}>*</Text></Text>
+                <Text style={styles.idLabel}>{i18n.t('register.idVerification.aadharTitle', { lng: language })} <Text style={{ color: COLORS.primary }}>*</Text></Text>
                 <View style={styles.idRow}>
                   {/* Front */}
                   <View style={styles.idBox}>
@@ -1143,7 +1278,7 @@ const EditProfileScreen = ({ navigation }) => {
                     ) : (
                       <TouchableOpacity style={styles.center} onPress={() => pickPhoto(setAadharFront)}>
                         <Icon name="camera-outline" size={24} color={COLORS.gray} />
-                        <Text style={styles.uploadText}>Front</Text>
+                        <Text style={styles.uploadText}>{i18n.t('register.idVerification.frontSide', { lng: language })}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1159,7 +1294,7 @@ const EditProfileScreen = ({ navigation }) => {
                     ) : (
                       <TouchableOpacity style={styles.center} onPress={() => pickPhoto(setAadharBack)}>
                         <Icon name="camera-outline" size={24} color={COLORS.gray} />
-                        <Text style={styles.uploadText}>Back</Text>
+                        <Text style={styles.uploadText}>{i18n.t('register.idVerification.backSide', { lng: language })}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1168,7 +1303,7 @@ const EditProfileScreen = ({ navigation }) => {
 
               {/* PAN */}
               <View>
-                <Text style={styles.idLabel}>PAN Card (Optional)</Text>
+                <Text style={styles.idLabel}>{i18n.t('register.idVerification.panTitle', { lng: language })}</Text>
                 <View style={styles.idRow}>
                   <View style={styles.idBox}>
                     {panFront ? (
@@ -1181,7 +1316,7 @@ const EditProfileScreen = ({ navigation }) => {
                     ) : (
                       <TouchableOpacity style={styles.center} onPress={() => pickPhoto(setPanFront)}>
                         <Icon name="camera-outline" size={24} color={COLORS.gray} />
-                        <Text style={styles.uploadText}>Front</Text>
+                        <Text style={styles.uploadText}>{i18n.t('register.idVerification.frontSide', { lng: language })}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1196,7 +1331,7 @@ const EditProfileScreen = ({ navigation }) => {
                     ) : (
                       <TouchableOpacity style={styles.center} onPress={() => pickPhoto(setPanBack)}>
                         <Icon name="camera-outline" size={24} color={COLORS.gray} />
-                        <Text style={styles.uploadText}>Back</Text>
+                        <Text style={styles.uploadText}>{i18n.t('register.idVerification.backSide', { lng: language })}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1205,24 +1340,24 @@ const EditProfileScreen = ({ navigation }) => {
             </View>
 
             {/* --- FAMILY & LIFESTYLE --- */}
-            <Text style={styles.sectionHeader}>Family Details</Text>
-            <CustomPicker label="Father Status" selectedValue={fatherStatus} onValueChange={setFatherStatus} items={FATHER_STATUS_OPTIONS} required />
-            <CustomPicker label="Mother Status" selectedValue={motherStatus} onValueChange={setMotherStatus} items={MOTHER_STATUS_OPTIONS} required />
+            <Text style={styles.sectionHeader}>{i18n.t('register.labels.familyDetails', { lng: language })}</Text>
+            <CustomPicker label={i18n.t('register.labels.fatherStatus', { lng: language })} selectedValue={fatherStatus} onValueChange={setFatherStatus} items={FATHER_STATUS_OPTIONS} placeholder={i18n.t('register.placeholders.selectFatherStatus', { lng: language })} required />
+            <CustomPicker label={i18n.t('register.labels.motherStatus', { lng: language })} selectedValue={motherStatus} onValueChange={setMotherStatus} items={MOTHER_STATUS_OPTIONS} placeholder={i18n.t('register.placeholders.selectMotherStatus', { lng: language })} required />
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}><FloatingLabelInput label="Brothers" value={brothers} onChangeText={setBrothers} required keyboardType="numeric" /></View>
-              <View style={{ flex: 1 }}><FloatingLabelInput label="Sisters" value={sisters} onChangeText={setSisters} required keyboardType="numeric" /></View>
+              <View style={{ flex: 1 }}><FloatingLabelInput label={i18n.t('register.labels.brothers', { lng: language })} value={brothers} onChangeText={setBrothers} required keyboardType="numeric" /></View>
+              <View style={{ flex: 1 }}><FloatingLabelInput label={i18n.t('register.labels.sisters', { lng: language })} value={sisters} onChangeText={setSisters} required keyboardType="numeric" /></View>
             </View>
-            <CustomPicker label="Family Type" selectedValue={familyType} onValueChange={setFamilyType} items={[{ name: 'Nuclear', value: 'Nuclear' }, { name: 'Joint', value: 'Joint' }, { name: 'Other', value: 'Other' }]} required />
-            <CustomPicker label="Family Values" selectedValue={familyValues} onValueChange={setFamilyValues} items={FAMILY_VALUES_OPTIONS} required />
-            <CustomPicker label="Family Location" selectedValue={familyLocation} onValueChange={setFamilyLocation} items={(allMetaData.locations || []).map(item => ({ value: item._id, name: `${item.city}, ${item.state}, ${item.country}` }))} searchable />
+            <CustomPicker label={i18n.t('register.labels.familyType', { lng: language })} selectedValue={familyType} onValueChange={setFamilyType} items={[{ name: 'Nuclear', value: 'Nuclear' }, { name: 'Joint', value: 'Joint' }, { name: 'Other', value: 'Other' }]} placeholder={i18n.t('register.placeholders.selectFamilyType', { lng: language })} required />
+            <CustomPicker label={i18n.t('register.labels.familyValues', { lng: language })} selectedValue={familyValues} onValueChange={setFamilyValues} items={FAMILY_VALUES_OPTIONS} placeholder={i18n.t('register.placeholders.selectFamilyValues', { lng: language })} required />
+            <CustomPicker label={i18n.t('register.labels.familyLocation', { lng: language })} selectedValue={familyLocation} onValueChange={setFamilyLocation} items={(allMetaData.locations || []).map(item => ({ value: item._id, name: `${item.city}, ${item.state}, ${item.country}` }))} placeholder={i18n.t('register.placeholders.selectFamilyLocation', { lng: language })} searchable />
 
-            <Text style={styles.sectionHeader}>Lifestyle</Text>
-            <CustomPicker label="Diet" selectedValue={diet} onValueChange={setDiet} items={[{ name: 'Vegetarian', value: 'Vegetarian' }, { name: 'Non-Vegetarian', value: 'Non-Vegetarian' }, { name: 'Eggetarian', value: 'Eggetarian' }, { name: 'Vegan', value: 'Vegan' }, { name: 'Jain', value: 'Jain' }]} required />
-            <CustomPicker label="Smoking" selectedValue={smoking} onValueChange={setSmoking} items={[{ name: 'No', value: 'No' }, { name: 'Yes', value: 'Yes' }, { name: 'Occasionally', value: 'Occasionally' }]} />
-            <CustomPicker label="Drinking" selectedValue={drinking} onValueChange={setDrinking} items={[{ name: 'No', value: 'No' }, { name: 'Yes', value: 'Yes' }, { name: 'Occasionally', value: 'Occasionally' }]} />
+            <Text style={styles.sectionHeader}>{i18n.t('register.labels.lifestyle', { lng: language })}</Text>
+            <CustomPicker label={i18n.t('register.labels.diet', { lng: language })} selectedValue={diet} onValueChange={setDiet} items={[{ name: 'Vegetarian', value: 'Vegetarian' }, { name: 'Non-Vegetarian', value: 'Non-Vegetarian' }, { name: 'Eggetarian', value: 'Eggetarian' }, { name: 'Vegan', value: 'Vegan' }, { name: 'Jain', value: 'Jain' }]} placeholder={i18n.t('register.placeholders.selectDiet', { lng: language })} required />
+            <CustomPicker label={i18n.t('register.labels.smoking', { lng: language })} selectedValue={smoking} onValueChange={setSmoking} items={[{ name: 'No', value: 'No' }, { name: 'Yes', value: 'Yes' }, { name: 'Occasionally', value: 'Occasionally' }]} placeholder={i18n.t('register.placeholders.smokingHabit', { lng: language })} />
+            <CustomPicker label={i18n.t('register.labels.drinking', { lng: language })} selectedValue={drinking} onValueChange={setDrinking} items={[{ name: 'No', value: 'No' }, { name: 'Yes', value: 'Yes' }, { name: 'Occasionally', value: 'Occasionally' }]} placeholder={i18n.t('register.placeholders.drinkingHabit', { lng: language })} />
 
             {/* Privacy Settings */}
-            <Text style={styles.sectionHeader}>Privacy Settings</Text>
+            <Text style={styles.sectionHeader}>{i18n.t('register.labels.privacy', { lng: language })}</Text>
             {(() => {
               const PrivacyToggle = ({ label, value, onChange }) => (
                 <View style={{ marginBottom: 15 }}>
@@ -1247,7 +1382,7 @@ const EditProfileScreen = ({ navigation }) => {
                       onPress={() => onChange('public')}
                     >
                       <Icon name="lock-open-outline" size={18} color={value === 'public' ? COLORS.white : COLORS.darkGray} style={{ marginRight: 6 }} />
-                      <Text style={{ fontSize: 14, color: value === 'public' ? COLORS.white : COLORS.darkGray, fontWeight: '500' }}>Public</Text>
+                      <Text style={{ fontSize: 14, color: value === 'public' ? COLORS.white : COLORS.darkGray, fontWeight: '500' }}>{i18n.t('privacy.public', { lng: language })}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -1267,7 +1402,7 @@ const EditProfileScreen = ({ navigation }) => {
                       onPress={() => onChange('private')}
                     >
                       <Icon name="lock-closed-outline" size={18} color={value === 'private' ? COLORS.white : COLORS.darkGray} style={{ marginRight: 6 }} />
-                      <Text style={{ fontSize: 14, color: value === 'private' ? COLORS.white : COLORS.darkGray, fontWeight: '500' }}>Private</Text>
+                      <Text style={{ fontSize: 14, color: value === 'private' ? COLORS.white : COLORS.darkGray, fontWeight: '500' }}>{i18n.t('privacy.private', { lng: language })}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1276,17 +1411,17 @@ const EditProfileScreen = ({ navigation }) => {
               return (
                 <>
                   <PrivacyToggle
-                    label="Profile Visibility"
+                    label={i18n.t('register.labels.profileVisibility', { lng: language })}
                     value={profileVisibility}
                     onChange={setProfileVisibility}
                   />
                   <PrivacyToggle
-                    label="Photo Visibility"
+                    label={i18n.t('register.labels.photoVisibility', { lng: language })}
                     value={photoVisibility}
                     onChange={setPhotoVisibility}
                   />
                   <PrivacyToggle
-                    label="Contact Visibility"
+                    label={i18n.t('register.labels.contactVisibility', { lng: language })}
                     value={contactVisibility}
                     onChange={setContactVisibility}
                   />
@@ -1297,7 +1432,7 @@ const EditProfileScreen = ({ navigation }) => {
 
 
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveText}>Save Changes</Text>
+              <Text style={styles.saveText}>{i18n.t('headers.editProfile', { lng: language })}</Text>
             </TouchableOpacity>
           </ScrollView>
         </Animated.View>
@@ -1313,19 +1448,19 @@ const EditProfileScreen = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <ActivityIndicator size="large" color={COLORS.primary} style={{ marginBottom: 15 }} />
-            <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.black, marginBottom: 5 }}>Updating Profile</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.black, marginBottom: 5 }}>{i18n.t('editProfileProgress.title', { lng: language })}</Text>
 
             {/* Progress Bar */}
             <View style={styles.progressTrack}>
               <View style={[styles.progressBar, { width: `${uploadProgress}%` }]} />
             </View>
-            <Text style={{ fontWeight: 'bold', color: COLORS.primary, marginBottom: 10 }}>{uploadProgress}% Completed</Text>
+            <Text style={{ fontWeight: 'bold', color: COLORS.primary, marginBottom: 10 }}>{uploadProgress}% {i18n.t('editProfileProgress.completed', { lng: language })}</Text>
 
             <Text style={styles.progressText}>
-              Your data is updating and your images are uploading.{'\n'}Please wait for it to complete.
+              {i18n.t('editProfileProgress.body', { lng: language })}
             </Text>
             <Text style={[styles.progressText, { fontSize: 12, marginTop: 10, color: '#888' }]}>
-              Note: Time taken depends on your internet connection speed.
+              {i18n.t('editProfileProgress.note', { lng: language })}
             </Text>
           </View>
         </View>

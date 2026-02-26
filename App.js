@@ -9,7 +9,7 @@ import { LanguageProvider } from './src/contexts/LanguageContext';
 import SocketManager from './src/components/SocketManager';
 import '@react-native-firebase/app';
 import messaging from '@react-native-firebase/messaging';
-import notifee, { AndroidImportance } from '@notifee/react-native';
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import axios from 'axios';
@@ -17,17 +17,27 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { generateNewFcmToken, registerTokenRefresh } from './src/utils/notificationHelper';
-import { fetchNotifications, fetchUnreadNotificationCount } from './src/redux/slices/notificationSlice';
-import { navigate } from './src/navigation/navigationRef';
+import {
+  fetchNotifications,
+  fetchUnreadNotificationCount,
+  fetchUnreadUserNotificationCount,
+} from './src/redux/slices/notificationSlice';
+import { fetchUnreadMessageCount } from './src/redux/slices/messageSlice';
+import { navigate, navigationRef } from './src/navigation/navigationRef';
 import { COLORS } from './src/constants/theme';
 import { API_BASE_URL } from './src/constants/config';
 import { InterestProvider } from './src/contexts/InterestContext';
 import Icon from 'react-native-vector-icons/Ionicons';
 import UpdateManager from './src/components/UpdateManager';
 import NoticeManager from './src/components/NoticeManager';
+import { logout } from './src/redux/actions/authActions';
+import { isTokenExpired } from './src/utils/authSession';
+
+const PENDING_NOTIFICATION_NAVIGATION_KEY = 'pending_notification_navigation';
+const GLOBAL_ERROR_SCREEN_EXEMPT_ROUTES = new Set(['Register', 'EditProfile']);
 
 const AppContent = () => {
-  const { user, token } = useSelector(state => state.auth);
+  const { user, token, isAuthenticated } = useSelector(state => state.auth);
   const [isReady, setIsReady] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [serverDown, setServerDown] = useState(false);
@@ -35,6 +45,8 @@ const AppContent = () => {
   const dispatch = useDispatch();
   const pollRef = React.useRef(null);
   const serverPollRef = React.useRef(null);
+  const forceLogoutInProgress = React.useRef(false);
+  const pendingNotifDrained = React.useRef(false);
 
   const setOfflineFromState = state => {
     const offline =
@@ -45,8 +57,190 @@ const AppContent = () => {
     setIsOffline(offline);
   };
 
+  const isGlobalErrorScreenExemptRoute = () => {
+    if (!navigationRef.isReady()) return false;
+    const routeName = navigationRef.getCurrentRoute()?.name;
+    return GLOBAL_ERROR_SCREEN_EXEMPT_ROUTES.has(routeName);
+  };
+
+  const persistPendingNotificationNavigation = async (data = {}) => {
+    try {
+      if (!data || Object.keys(data).length === 0) return;
+      await AsyncStorage.setItem(PENDING_NOTIFICATION_NAVIGATION_KEY, JSON.stringify(data));
+    } catch (e) {
+      // non-blocking
+    }
+  };
+
+  const normalizeId = value => {
+    if (value && typeof value === 'object') {
+      const maybeId = value._id || value.id;
+      return maybeId ? String(maybeId) : null;
+    }
+
+    if (value === undefined || value === null) return null;
+    const raw = String(value).trim();
+    if (!raw || raw === 'undefined' || raw === 'null') return null;
+    return raw;
+  };
+
+  const goToBottomTab = (tabName, nestedParams) => {
+    navigate('App', {
+      screen: 'HomeTabs',
+      params: {
+        screen: tabName,
+        ...(nestedParams ? { params: nestedParams } : {}),
+      },
+    });
+  };
+
+  const handleNotificationNavigation = async (data = {}) => {
+    if (!data || Object.keys(data).length === 0) return;
+
+    if (!isAuthenticated) {
+      await persistPendingNotificationNavigation(data);
+      return;
+    }
+
+    const notificationType = String(data.type || data.event || '').toLowerCase();
+    const notificationId = normalizeId(data.notificationId);
+    const targetChatId = normalizeId(data.chatId || data.chat || data.referenceId);
+    const targetProfileId = normalizeId(
+      data.senderId || data.viewerId || data.userId || data.referenceId || data.interestId,
+    );
+
+    const resolveMessageChatId = async () => {
+      const senderId = normalizeId(data.senderId || data.userId);
+
+      // Prefer explicit chat id, but validate it before navigating.
+      if (targetChatId && token) {
+        try {
+          const res = await axios.get(`${API_BASE_URL}/api/chat/${targetChatId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            suppressGlobalError: true,
+          });
+          if (res?.data?.success && res?.data?.chat?._id) {
+            return normalizeId(res.data.chat._id);
+          }
+        } catch (e) {
+          // fall back to sender-based lookup below
+        }
+      }
+
+      if (!senderId || !token) return null;
+
+      // Fallback: create/get chat by sender so message tap always opens a valid thread.
+      try {
+        const res = await axios.post(
+          `${API_BASE_URL}/api/chat/create`,
+          { recipientId: senderId },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            suppressGlobalError: true,
+          },
+        );
+
+        const createdChatId = normalizeId(res?.data?.chat?._id || res?.data?.chatId);
+        return createdChatId || null;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    if (notificationType === 'message') {
+      const resolvedChatId = await resolveMessageChatId();
+      if (resolvedChatId) {
+        navigate('MessageScreen', { chatId: resolvedChatId, notificationId });
+      } else {
+        goToBottomTab('Messenger');
+      }
+      return;
+    }
+
+    if (notificationType === 'interest' || notificationType === 'view') {
+      if (targetProfileId) {
+        navigate('ProfileDetailScreen', {
+          profileId: targetProfileId,
+          item: { _id: targetProfileId },
+        });
+      } else {
+        goToBottomTab('Activity');
+      }
+      return;
+    }
+
+    if (
+      notificationType === 'interest_accepted' ||
+      notificationType === 'interest_declined'
+    ) {
+      goToBottomTab('Activity');
+      return;
+    }
+
+    if (notificationType === 'subscription') {
+      goToBottomTab('Upgrade');
+      return;
+    }
+
+    if (notificationType === 'nearby_profiles') {
+      goToBottomTab('Matches', { screen: 'Nearby' });
+      return;
+    }
+
+    if (notificationType === 'today_matches') {
+      goToBottomTab('Matches', { screen: 'Just Joined' });
+      return;
+    }
+
+    if (notificationType === 'new_match') {
+      goToBottomTab('Matches', { screen: 'Your Matches' });
+      return;
+    }
+
+    if (notificationType === 'profile_approved' || notificationType === 'approval') {
+      goToBottomTab('Home');
+      return;
+    }
+
+    goToBottomTab('Activity');
+  };
+
+  useEffect(() => {
+    if (!token) return;
+
+    if (isTokenExpired(token) && !forceLogoutInProgress.current) {
+      forceLogoutInProgress.current = true;
+      dispatch(logout()).finally(() => {
+        forceLogoutInProgress.current = false;
+      });
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      if (isTokenExpired(token) && !forceLogoutInProgress.current) {
+        forceLogoutInProgress.current = true;
+        dispatch(logout()).finally(() => {
+          forceLogoutInProgress.current = false;
+        });
+      }
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [dispatch, token]);
+
+  // Reset the drain flag on logout so the next login triggers a fresh check.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      pendingNotifDrained.current = false;
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     const checkServer = async () => {
+      if (isGlobalErrorScreenExemptRoute()) {
+        setServerDown(false);
+        return;
+      }
       try {
         const res = await axios.get(`${API_BASE_URL}/api/health`, { timeout: 4000 });
         if (!res || res.status >= 500) {
@@ -68,6 +262,9 @@ const AppContent = () => {
     const reqInterceptor = axios.interceptors.request.use(
       config => config,
       error => {
+        if (error?.config?.suppressGlobalError) {
+          return Promise.reject(error);
+        }
         setServerDown(true);
         setIsReady(true);
         return Promise.reject(error);
@@ -82,8 +279,18 @@ const AppContent = () => {
         return response;
       },
       error => {
+        if (error?.config?.suppressGlobalError) {
+          return Promise.reject(error);
+        }
         const status = error?.response?.status;
-        if (!error.response || status >= 500) {
+        if (status === 401 && token && !forceLogoutInProgress.current) {
+          forceLogoutInProgress.current = true;
+          dispatch(logout()).finally(() => {
+            forceLogoutInProgress.current = false;
+          });
+        }
+
+        if ((!error.response || status >= 500) && !isGlobalErrorScreenExemptRoute()) {
           setServerDown(true);
           setIsReady(true);
         }
@@ -122,6 +329,7 @@ const AppContent = () => {
     const initializeApp = async () => {
       let unsubscribeForeground;
       let unsubscribeNotificationOpened;
+      let unsubscribeNotifeeForeground;
 
       try {
         if (token) {
@@ -169,71 +377,115 @@ const AppContent = () => {
           unsubscribeForeground = messaging().onMessage(async remoteMessage => {
             console.log('Foreground message:', remoteMessage);
 
-            const payload = remoteMessage.notification || remoteMessage.data || {};
-            if (remoteMessage.data?.senderId === user?._id) return;
-
-            const notificationTitle = payload.title;
-            const notificationBody = payload.body;
-
-            if (notificationTitle || notificationBody) {
-              await notifee.displayNotification({
-                title: notificationTitle,
-                body: notificationBody,
-                android: { channelId: 'default' },
-              });
-            }
+            if (remoteMessage?.data?.senderId === user?._id) return;
+            const data = remoteMessage?.data || {};
+            const messageType = data?.type;
 
             dispatch(fetchNotifications());
             dispatch(fetchUnreadNotificationCount());
+            dispatch(fetchUnreadUserNotificationCount());
+            dispatch(fetchUnreadMessageCount());
+
+            // Foreground rule: only show push popup for chat messages.
+            if (messageType !== 'message') return;
+
+            const currentRoute = navigationRef.isReady()
+              ? navigationRef.getCurrentRoute()
+              : null;
+            const isInsideMessageScreen = currentRoute?.name === 'MessageScreen';
+            const openedChatId = currentRoute?.params?.chatId;
+            const incomingChatId = data?.referenceId || data?.chatId;
+
+            // Suppress notification if user is already inside same chat.
+            if (
+              isInsideMessageScreen &&
+              openedChatId &&
+              incomingChatId &&
+              String(openedChatId) === String(incomingChatId)
+            ) {
+              return;
+            }
+
+            const notificationTitle =
+              remoteMessage?.notification?.title ||
+              data?.title ||
+              data?.notificationTitle ||
+              'New Message';
+            const notificationBody =
+              remoteMessage?.notification?.body ||
+              data?.body ||
+              data?.message ||
+              data?.notificationBody ||
+              '';
+
+            if (!notificationTitle && !notificationBody) return;
+
+            await notifee.displayNotification({
+              title: notificationTitle,
+              body: notificationBody,
+              data,
+              android: {
+                channelId: 'default',
+                pressAction: { id: 'default' },
+              },
+            });
           });
 
-          // 🚀 Handle Notification Redirection Logic
-          const handleNotificationNavigation = (remoteMessage) => {
-            if (!remoteMessage?.data) return;
-
-            const { type, referenceId, chatId, interestId, senderId } = remoteMessage.data;
-            const targetId = referenceId || chatId || interestId;
-
-            console.log('🔔 Notification Clicked:', remoteMessage.data);
-
-            if (type === 'message') {
-              if (targetId) {
-                navigate('MessageScreen', { chatId: targetId });
-              } else {
-                navigate('App', { screen: 'HomeTabs', params: { screen: 'Activity' } }); // Fallback
-              }
-            }
-            else if (type === 'interest' || type === 'view') {
-              // For interest/view, usually go to profile. 
-              // If we have specific InterestDetail, we'd go there.
-              // Currently matching ActivityScreen logic -> ProfileDetail
-              const profileId = senderId;
-              if (profileId) {
-                navigate('ProfileDetailScreen', { profileId, item: { _id: profileId } }); // item added for safety
-              } else {
-                navigate('App', { screen: 'HomeTabs', params: { screen: 'Activity' } });
-              }
-            }
-            else {
-              navigate('App', { screen: 'HomeTabs', params: { screen: 'Activity' } });
-            }
-          };
-
-          unsubscribeNotificationOpened = messaging().onNotificationOpenedApp(remoteMessage => {
-            handleNotificationNavigation(remoteMessage);
+          unsubscribeNotificationOpened = messaging().onNotificationOpenedApp(async remoteMessage => {
+            await handleNotificationNavigation(remoteMessage?.data || {});
           });
 
+          unsubscribeNotifeeForeground = notifee.onForegroundEvent(async ({ type, detail }) => {
+            if (type === EventType.PRESS || type === EventType.ACTION_PRESS) {
+              await handleNotificationNavigation(detail?.notification?.data || {});
+            }
+          });
+
+          // NOTE: Initial notification handling (killed-app launch) is done in the
+          // dedicated `pendingNotifDrained` useEffect below, which waits for both
+          // authentication and navigation readiness before navigating.
+          // Seed any un-persisted initial notifications into AsyncStorage so the
+          // effect picks them up reliably.
           const initialNotification = await messaging().getInitialNotification();
-          if (initialNotification) {
-            handleNotificationNavigation(initialNotification);
+          if (initialNotification?.data && Object.keys(initialNotification.data).length > 0) {
+            const existing = await AsyncStorage.getItem(PENDING_NOTIFICATION_NAVIGATION_KEY);
+            if (!existing) {
+              await AsyncStorage.setItem(
+                PENDING_NOTIFICATION_NAVIGATION_KEY,
+                JSON.stringify(initialNotification.data),
+              );
+            }
+          }
+
+          const initialNotifeeNotification = await notifee.getInitialNotification();
+          if (initialNotifeeNotification?.notification?.data &&
+            Object.keys(initialNotifeeNotification.notification.data).length > 0) {
+            const existing = await AsyncStorage.getItem(PENDING_NOTIFICATION_NAVIGATION_KEY);
+            if (!existing) {
+              await AsyncStorage.setItem(
+                PENDING_NOTIFICATION_NAVIGATION_KEY,
+                JSON.stringify(initialNotifeeNotification.notification.data),
+              );
+            }
           }
 
           setIsReady(true);
           return () => {
             if (unsubscribeForeground) unsubscribeForeground();
             if (unsubscribeNotificationOpened) unsubscribeNotificationOpened();
+            if (unsubscribeNotifeeForeground) unsubscribeNotifeeForeground();
           };
         } else {
+          unsubscribeNotificationOpened = messaging().onNotificationOpenedApp(async remoteMessage => {
+            await persistPendingNotificationNavigation(remoteMessage?.data || {});
+          });
+
+          unsubscribeNotifeeForeground = notifee.onForegroundEvent(async ({ type, detail }) => {
+            if (type === EventType.PRESS || type === EventType.ACTION_PRESS) {
+              await persistPendingNotificationNavigation(detail?.notification?.data || {});
+            }
+          });
+
           setIsReady(true);
         }
       } catch (error) {
@@ -261,9 +513,53 @@ const AppContent = () => {
       axios.interceptors.response.eject(resInterceptor);
       cancelled = true;
     };
-  }, [token, dispatch, user?._id]);
+  }, [token, isAuthenticated, dispatch, user?._id]);
 
-  if (isOffline) {
+  // ─── Drain Pending Notification Navigation ──────────────────────────────────
+  // Fires once when the user becomes authenticated. It waits for the
+  // NavigationContainer to finish mounting before navigating, which is the
+  // critical missing piece for the killed-app / quit-state notification tap.
+  useEffect(() => {
+    if (!isAuthenticated || pendingNotifDrained.current) return;
+
+    const drainPending = async () => {
+      // Poll until the NavigationContainer is ready (max ~3 s).
+      const waitForNav = () =>
+        new Promise(resolve => {
+          if (navigationRef.isReady()) { resolve(); return; }
+          let attempts = 0;
+          const interval = setInterval(() => {
+            attempts++;
+            if (navigationRef.isReady() || attempts > 30) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 100);
+        });
+
+      await waitForNav();
+
+      const raw = await AsyncStorage.getItem(PENDING_NOTIFICATION_NAVIGATION_KEY);
+      if (!raw) return;
+
+      pendingNotifDrained.current = true;
+      await AsyncStorage.removeItem(PENDING_NOTIFICATION_NAVIGATION_KEY);
+
+      try {
+        const data = JSON.parse(raw);
+        await handleNotificationNavigation(data);
+      } catch (e) {
+        // ignore malformed payload
+      }
+    };
+
+    drainPending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  const hideGlobalErrorScreens = isGlobalErrorScreenExemptRoute();
+
+  if (isOffline && !hideGlobalErrorScreens) {
     return (
       <View
         style={{
@@ -354,7 +650,7 @@ const AppContent = () => {
     );
   }
 
-  if (serverDown) {
+  if (serverDown && !hideGlobalErrorScreens) {
     return (
       <View
         style={{

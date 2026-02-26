@@ -1,15 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { View, Text, Modal, TouchableOpacity, Linking, StyleSheet, Image, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkVersion, getCurrentVersion, trackUpdateEvent } from '../services/versionService';
 import { COLORS } from '../constants/theme';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSelector } from 'react-redux';
+import i18n from '../localization/i18n';
+import { LanguageContext } from '../contexts/LanguageContext';
 
 const POPUP_COOLDOWN = 2 * 60 * 60 * 1000; // 2 hours in ms
 const LAST_POPUP_KEY = 'last_update_popup_time';
 
 const UpdateManager = () => {
+    const { language } = useContext(LanguageContext);
+    const t = (key, opts) => i18n.t(key, { locale: language, lng: language, ...opts });
     const [visible, setVisible] = useState(false);
     const [updateData, setUpdateData] = useState(null);
     const { user } = useSelector(state => state.auth);
@@ -143,7 +147,7 @@ const UpdateManager = () => {
                         <View style={styles.iconContainer}>
                             <Icon name="rocket-launch" size={40} color={COLORS.white} />
                         </View>
-                        <Text style={styles.title}>Update Available!</Text>
+                        <Text style={styles.title}>{t('updateManager.title')}</Text>
                         <Text style={styles.subTitle}>v{version}</Text>
                     </View>
 
@@ -151,7 +155,7 @@ const UpdateManager = () => {
                         <Text style={styles.releaseTitle}>{title}</Text>
 
                         <View style={styles.notesContainer}>
-                            <Text style={styles.notesHeader}>What's New:</Text>
+                            <Text style={styles.notesHeader}>{t('updateManager.whatsNew')}</Text>
                             <Text style={styles.notesText}>{changelog}</Text>
                         </View>
 
@@ -159,7 +163,7 @@ const UpdateManager = () => {
                             style={styles.updateBtn}
                             onPress={handleUpdateNow}
                         >
-                            <Text style={styles.updateBtnText}>Update Now</Text>
+                            <Text style={styles.updateBtnText}>{t('updateManager.updateNow')}</Text>
                         </TouchableOpacity>
 
                         {!isForceUpdate && (
@@ -167,7 +171,7 @@ const UpdateManager = () => {
                                 style={styles.laterBtn}
                                 onPress={handleUpdateLater}
                             >
-                                <Text style={styles.laterBtnText}>Update Later</Text>
+                                <Text style={styles.laterBtnText}>{t('updateManager.updateLater')}</Text>
                             </TouchableOpacity>
                         )}
                     </View>

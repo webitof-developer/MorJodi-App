@@ -13,7 +13,6 @@ const initialState = {
   currentPage: 1,
 };
 
-// ✅ Async thunks (same as before)
 export const fetchNotifications = createAsyncThunk(
   'notifications/fetchNotifications',
   async ({ page = 1, limit = 30 } = {}, { rejectWithValue, getState }) => {
@@ -21,7 +20,6 @@ export const fetchNotifications = createAsyncThunk(
       const { token } = getState().auth;
       const config = { headers: { Authorization: `Bearer ${token}` } };
       const response = await axios.get(`${API_BASE_URL}/api/notifications?page=${page}&limit=${limit}`, config);
-      // console.log('notification data',response.data)
       return { notifications: response.data.notifications, page, limit };
     } catch (error) {
       return rejectWithValue(error?.response?.data || error.message);
@@ -84,27 +82,47 @@ export const markOneNotificationAsOpen = createAsyncThunk(
     }
   }
 );
+
 export const fetchUnreadUserNotificationCount = createAsyncThunk(
   'notifications/fetchUnreadUserNotificationCount',
-  async (_, { getState }) => {
-    const { token } = getState().auth;
-    const config = {
-      headers: { Authorization: `Bearer ${token}` },
-    };
-
-    const response = await axios.get(`${API_BASE_URL}/api/notifications/unread-user-count`, config);
-    return response.data;
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const { token } = getState().auth;
+      const config = {
+        headers: { Authorization: `Bearer ${token}` },
+      };
+      const response = await axios.get(`${API_BASE_URL}/api/notifications/unread-user-count`, config);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || error.message);
+    }
   }
 );
 
-// ✅ Slice
+export const markMessageNotificationsByChatAsRead = createAsyncThunk(
+  'notifications/markMessageByChatAsRead',
+  async (chatId, { getState, rejectWithValue }) => {
+    try {
+      const { token } = getState().auth;
+      const config = {
+        headers: { Authorization: `Bearer ${token}` },
+      };
+      const response = await axios.post(`${API_BASE_URL}/api/notifications/mark-message-read/${chatId}`, {}, config);
+      return { chatId, data: response.data };
+    } catch (error) {
+      return rejectWithValue(error?.response?.data || error.message);
+    }
+  }
+);
+
 const notificationSlice = createSlice({
   name: 'notifications',
   initialState,
   reducers: {
-    clearNotifications: (state) => {
+    clearNotifications: state => {
       state.notifications = [];
       state.unreadCount = 0;
+      state.totalUsersWithMessages = 0;
       state.hasMore = true;
       state.currentPage = 1;
     },
@@ -112,45 +130,37 @@ const notificationSlice = createSlice({
       const notificationId = action.payload;
       const index = state.notifications.findIndex(n => n._id === notificationId);
       if (index !== -1) {
+        const wasUnread = !state.notifications[index].isRead;
         state.notifications[index].isRead = true;
         state.notifications[index].isOpen = true;
+        if (wasUnread) {
+          state.unreadCount = Math.max(0, state.unreadCount - 1);
+        }
       }
     },
-    incrementUnreadCount: (state) => {
+    incrementUnreadCount: state => {
       state.unreadCount += 1;
     },
     addNotification: (state, action) => {
       const incoming = action.payload;
       const index = state.notifications.findIndex(n => n._id === incoming._id);
+      const wasReadBefore = index !== -1 ? !!state.notifications[index].isRead : true;
 
       if (index !== -1) {
-        // Remove existing
         state.notifications.splice(index, 1);
-        // If it was read before, and now it's unread (logic in controller sets isRead=false), increment unread
-        // But simplistic view: just unshift. The controller says isRead: false.
-        // If the old one was read, count++
-        // If the old one was unread, count stays same (we already counted it)
-        // However, this logic is tricky if we don't know the OLD state perfectly here.
-        // Let's assume the controller sends 'isRead: false'.
-        // If the item in state was read, we increment.
-        // BUT simpler:
-        // We removed it. Now we add it. 
-        // We will just re-calculate unread count or trust the increment.
-        // Actually, let's keep it simple:
-        // If we remove an UNREAD item, we decrement. Then we add an UNREAD item, we increment. Net change 0.
-        // If we remove a READ item, we don't decrement. We add an UNREAD item, we increment. Net change +1.
-      } else {
+      }
+
+      const shouldIncreaseUnread = incoming?.isRead === false && wasReadBefore;
+      if (shouldIncreaseUnread) {
         state.unreadCount += 1;
       }
 
-      // Add to top
       state.notifications.unshift(incoming);
     },
   },
-  extraReducers: (builder) => {
+  extraReducers: builder => {
     builder
-      // Fetch Notifications
-      .addCase(fetchNotifications.pending, (state) => {
+      .addCase(fetchNotifications.pending, state => {
         state.loading = true;
         state.error = null;
       })
@@ -161,9 +171,8 @@ const notificationSlice = createSlice({
         if (page === 1) {
           state.notifications = notifications;
         } else {
-          // Filter out duplicates just in case
           const newNotifications = notifications.filter(
-            (n) => !state.notifications.some((existing) => existing._id === n._id)
+            n => !state.notifications.some(existing => existing._id === n._id)
           );
           state.notifications = [...state.notifications, ...newNotifications];
         }
@@ -175,33 +184,45 @@ const notificationSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // Mark All as Read
-      .addCase(markAllNotificationsAsRead.fulfilled, (state) => {
-        state.notifications = state.notifications.map((n) => ({ ...n, isRead: true }));
+      .addCase(markAllNotificationsAsRead.fulfilled, state => {
+        state.notifications = state.notifications.map(n => ({ ...n, isRead: true, isOpen: true }));
         state.unreadCount = 0;
       })
-      // Mark One as Read
       .addCase(markOneNotificationAsRead.fulfilled, (state, action) => {
         const updated = action.payload;
         const index = state.notifications.findIndex(n => n._id === updated._id);
         if (index !== -1) {
+          const wasUnread = !state.notifications[index].isRead;
           state.notifications[index] = updated;
-          if (!updated.isRead) state.unreadCount = Math.max(0, state.unreadCount - 1);
+          if (wasUnread && updated.isRead) {
+            state.unreadCount = Math.max(0, state.unreadCount - 1);
+          }
         }
       })
-      // Unread Count
       .addCase(fetchUnreadNotificationCount.fulfilled, (state, action) => {
         state.unreadCount = action.payload;
       })
-      // Mark One as Open
       .addCase(markOneNotificationAsOpen.fulfilled, (state, action) => {
         const updated = action.payload;
         const index = state.notifications.findIndex(n => n._id === updated._id);
         if (index !== -1) state.notifications[index] = updated;
       })
+      .addCase(markMessageNotificationsByChatAsRead.fulfilled, (state, action) => {
+        const { chatId } = action.payload;
+        state.notifications = state.notifications.map(n => {
+          const sameChatMessage =
+            n.type === 'message' &&
+            String(n.referenceId) === String(chatId);
+          if (!sameChatMessage) return n;
+          return { ...n, isRead: true, isOpen: true };
+        });
+      })
       .addCase(fetchUnreadUserNotificationCount.fulfilled, (state, action) => {
-        const { totalUsersWithMessages } = action.payload; // Assuming response contains this
-        state.totalUsersWithMessages = totalUsersWithMessages; // Update the total users with unread messages
+        const { totalUsersWithMessages } = action.payload;
+        state.totalUsersWithMessages = totalUsersWithMessages;
+      })
+      .addCase(fetchUnreadUserNotificationCount.rejected, state => {
+        state.totalUsersWithMessages = 0;
       });
   },
 });

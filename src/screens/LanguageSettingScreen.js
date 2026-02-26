@@ -1,7 +1,8 @@
-import React, { useContext } from 'react';
+﻿import React, { useContext } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LanguageContext } from '../contexts/LanguageContext';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
+import i18n from '../localization/i18n';
 
 const LanguageSettingScreen = () => {
   const { language, changeLanguage } = useContext(LanguageContext);
@@ -40,8 +41,9 @@ const LanguageSettingScreen = () => {
 
   return (
     <View style={styles.container}>
-      {renderOption('en', 'English')}
-      {renderOption('hi', 'हिंदी')}
+      {renderOption('en', i18n.t('languageSetting.english'))}
+      {renderOption('hi', i18n.t('languageSetting.hindi'))}
+      {renderOption('cg', i18n.t('languageSetting.chhattisgarhi'))}
     </View>
   );
 };
@@ -94,3 +96,4 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
 });
+

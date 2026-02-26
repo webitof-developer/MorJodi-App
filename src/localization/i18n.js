@@ -1,8 +1,9 @@
-import { I18n } from 'i18n-js';
+﻿import { I18n } from 'i18n-js';
 import en from './en.json';
 import hi from './hi.json';
+import cg from './cg.json';
 
-const i18n = new I18n({ en, hi });
+const i18n = new I18n({ en, hi, cg });
 
 i18n.enableFallback = true;
 i18n.locale = 'en';
@@ -12,3 +13,4 @@ export const setI18nConfig = (lang) => {
 };
 
 export default i18n;
+

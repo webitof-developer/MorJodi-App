@@ -1,0 +1,938 @@
+﻿{
+    "onboarding": {
+        "slide1_title": "विवाह के नई यात्रा शुरू करव",
+        "slide1_desc": "छत्तीसगढ़ के शादी के संस्कृति अऊ परंपरा मन के साथ।",
+        "slide2_title": "अपन छत्तीसगढ़ी जोड़ीदार खोजव",
+        "slide2_desc": "यहां हर छत्तीसगढ़ी ला एक परफेक्ट जीवनसाथी मिलही।",
+        "slide3_title": "मुफ़्त चैट से शुरुआत करव",
+        "slide3_desc": "चैट करव, जुड़व अऊ रिश्ते बनाव – मोर जोड़ी के साथ",
+        "register": "नवा के उपयोगकरता? नि:शुल्क रजिस्टर करव",
+        "login": "कभू के उपयोगकरता? लॉगिन करव"
+    },
+    "auth": {
+        "login": "लॉग इन",
+        "register": "रजिस्टर करव",
+        "sendOtp": "ओटीपी भेजव",
+        "email": "ईमेल आईडी",
+        "phone": "मोबाइल नंबर",
+        "mobile": "मोबाइल",
+        "noAccount": "खाता नई हे? अभी रजिस्टर करव!",
+        "enterEmail": "अपन ईमेल दर्ज करव",
+        "enterPhone": "अपन मोबाइल नंबर दर्ज करव",
+        "loginModeUnavailable": "लॉगिन मोड उपलब्ध नई हे!",
+        "somethingWentWrong": "कुछ गलत हो गे",
+        "error": "गलती",
+        "loginTagline": "बिना झंझट अपन जोड़ीदार खोजव।",
+        "loginSubtitle": "लॉगिन करे के तरीका चुनव, अऊ हमन तुम्हर बर एक कोड भेजबो।",
+        "loginHelper": "तुम्हर खाता ला सुरक्षित रखे बर हमन एक कोड भेजबो।",
+        "invalidMethodTitle": "गलत तरीका",
+        "invalidEmailTitle": "गलत ईमेल",
+        "invalidNumberTitle": "गलत नंबर",
+        "invalidRequestTitle": "गलत अनुरोध"
+    },
+    "otp": {
+        "sentTo": "{{value}} पर ओटीपी भेज दे गे हे",
+        "expiresIn": "ओटीपी खतम होय बर समय",
+        "verify": "ओटीपी सत्यापित करव",
+        "resend": "ओटीपी फेर ले भेजव",
+        "enterOtpError": "किरपा करके 6 अंक के ओटीपी दर्ज करव।",
+        "error": "गलती",
+        "somethingWrong": "कुछ गलत हो गे",
+        "otpResent": "ओटीपी फेर ले भेज दे गे हे",
+        "resendFailed": "ओटीपी फेर ले भेजे म असफल। किरपा करके बाद म फेर ले प्रयास करव।"
+    },
+    "register": {
+        "title": "पंजीयन",
+        "page1": "खाता सेटअप",
+        "page2": "व्यक्तिगत जानकारी",
+        "page3": "पारिवारिक जानकारी",
+        "page4": "फोटो",
+        "page5": "पहचान सत्यापन",
+        "page6": "अंतिम जानकारी अउ गोपनीयता",
+        "submit": "पंजीयन कर के OTP पावव",
+        "fullName": "पूरा नाव *",
+        "email": "ईमेल आईडी *",
+        "phone": "मोबाइल नंबर *",
+        "next": "आगे",
+        "validationtext": {
+            "page1": "कृपया अपन पूरा नाव अउ ईमेल या मोबाइल नंबर भरो।",
+            "personalDetails": "कृपया जनम तारीख सहित सब जरूरी व्यक्तिगत जानकारी भरो।",
+            "backgroundDetails": "कृपया सब जरूरी पारिवारिक जानकारी चुनव।",
+            "finalDetails": "कृपया जीवनशैली, आय अउ अपन बारे म जानकारी भरो।",
+            "aboutMeRequired": "कृपया अपन बारे म लिखव।",
+            "aboutMeMin": "‘अपन बारे म’ कम से कम {{min}} अक्षर होना चाही।",
+            "aboutMeWords": "‘अपन बारे म’ कम से कम {{min}} सब्द होना चाही।",
+            "requiredDetails": "कृपया नीचे लिखे जानकारी भरो:\n\n{{fields}}",
+            "validEmail": "सही ईमेल भरव",
+            "validPhone": "सही 10 अंकीय मोबाइल नंबर भरव",
+            "mainPhotoRequired": "कृपया प्रोफाइल फोटो अपलोड करव।",
+            "minPhotosRequired": "कम से कम 3 फोटो (1 मुख्य + 2 गैलरी) अपलोड करव।",
+            "aadharRequired": "आधार कार्ड के आगे अउ पीछे दोनों साइड अपलोड करव।",
+            "invalidImageType": "सिर्फ JPG, PNG, WEBP, HEIC फोटो चलेही।",
+            "imageTooLarge": "फोटो आकार {{size}}MB ले कम होना चाही।",
+            "serverIssue": "अभी सर्वर व्यस्त हे, बाद म फिर कोसिस करव।"
+        },
+        "ageError": "पंजीयन बर कम से कम उमर 18 साल होना जरूरी हे।",
+        "registerFailed": "पंजीयन के समय कुछ गड़बड़ी होगे।",
+        "error": "त्रुटि",
+        "validation": "जांच",
+        "labels": {
+            "email": "ईमेल आईडी",
+            "phone": "मोबाइल नंबर",
+            "fullName": "पूरा नाव",
+            "gender": "लिंग",
+            "profileFor": "प्रोफाइल काकर बर",
+            "maritalStatus": "वैवाहिक स्थिति",
+            "children": "बच्चा",
+            "dob": "जनम तारीख",
+            "height": "लंबाई",
+            "religion": "धर्म",
+            "caste": "जाति",
+            "subCaste": "उपजाति",
+            "motherTongue": "मातृभाषा",
+            "profession": "पेशा",
+            "education": "पढ़ाई",
+            "location": "स्थान",
+            "familyDetails": "परिवार जानकारी",
+            "lifestyle": "जीवनशैली",
+            "diet": "खानपान",
+            "smoking": "धूम्रपान",
+            "drinking": "शराब सेवन",
+            "privacy": "गोपनीयता सेटिंग",
+            "profilePhotos": "प्रोफाइल फोटो",
+            "datingCardPhoto": "डेटिंग कार्ड फोटो",
+            "referralCode": "रेफरल कोड"
+        },
+        "actions": {
+            "uploadAadhar": "आधार फोटो अपलोड करव",
+            "uploadPan": "पैन कार्ड फोटो अपलोड करव",
+            "addPhotos": "प्रोफाइल फोटो जोड़व (ज्यादा से ज्यादा 5)"
+        },
+        "optional": "(वैकल्पिक)",
+        "annualIncome": "सालाना आय (जइसे 5 लाख) *",
+        "aboutMe": "अपन बारे म बताव (कम से कम 50 अक्षर)",
+        "attention": "ध्यान देव",
+        "groupPic": "समूह फोटो",
+        "highQualityPhotoHint": "अच्छा अउ साफ फोटो अपलोड करहू त ज्यादा रूचि अउ मैच मिलही!",
+        "idVerification": {
+            "title": "पहचान सत्यापन",
+            "subtitle": "सरकारी पहचान पत्र ले अपन प्रोफाइल सुरक्षित करव।",
+            "aadharTitle": "आधार कार्ड",
+            "panTitle": "पैन कार्ड (वैकल्पिक)",
+            "frontSide": "आगे के साइड",
+            "backSide": "पीछे के साइड"
+        },
+        "photoSection": {
+            "requiredMin": "कम से कम 3 साफ चेहरा दिखत फोटो जरूरी हे।",
+            "mainProfile": "प्रोफाइल फोटो",
+            "mainImage": "मुख्य फोटो",
+            "maxMin": "ज्यादा से ज्यादा 6 फोटो / कम से कम 3 फोटो",
+            "tipsTitle": "कुछ जरूरी सलाह",
+            "blurPhoto": "धुंधला फोटो",
+            "sideFace": "साइड चेहरा",
+            "watermark": "वॉटरमार्क फोटो"
+        }
+    },
+    "editProfile": {
+        "alerts": {
+            "success": "सफल",
+            "error": "त्रुटि",
+            "validation": "जांच",
+            "profileImageRemoved": "प्रोफाइल फोटो सफलतापूर्वक हटाय गीस।",
+            "idImageRemoved": "{{type}} कार्ड फोटो सफलतापूर्वक हटाय गीस।",
+            "photoRemovedServer": "फोटो सर्वर ले हटाय गीस।",
+            "photoRemovedLocal": "फोटो मोबाइल ले हटाय गीस।",
+            "removeFailed": "फोटो हटाय म असफल।",
+            "removeImageError": "फोटो हटावत समय कुछ गड़बड़ी होगे।",
+            "removeIdImageError": "{{type}} कार्ड फोटो हटावत समय गड़बड़ी होगे।",
+            "deletePhotoFailedServer": "सर्वर ले फोटो हटाय म असफल।",
+            "fetchMetaFailed": "पृष्ठभूमि विकल्प लाने म असफल।",
+            "saveValidation": "कृपया पूरा नाव, ईमेल अउ मोबाइल नंबर भरो।",
+            "profileUpdated": "प्रोफाइल सफलतापूर्वक अपडेट होगे!",
+            "saveFailed": "कुछ गड़बड़ी होगे।"
+        },
+        "labels": {
+            "email": "ईमेल आईडी",
+            "phone": "मोबाइल नंबर",
+            "fullName": "पूरा नाव",
+            "gender": "लिंग",
+            "profileFor": "प्रोफाइल काकर बर",
+            "maritalStatus": "वैवाहिक स्थिति",
+            "children": "बच्चा",
+            "mobile": "मोबाइल",
+            "manglik": "मांगलिक",
+            "dob": "जनम तारीख",
+            "height": "लंबाई",
+            "religion": "धर्म",
+            "caste": "जाति",
+            "subCaste": "उपजाति",
+            "gotra": "गोत्र",
+            "raasi": "राशि",
+            "motherTongue": "मातृभाषा",
+            "profession": "पेशा",
+            "education": "पढ़ाई",
+            "location": "स्थान",
+            "familyDetails": "परिवार जानकारी",
+            "fatherStatus": "पिता के स्थिति",
+            "motherStatus": "माता के स्थिति",
+            "brothers": "भाई के संख्या",
+            "sisters": "बहिनी के संख्या",
+            "familyType": "परिवार प्रकार",
+            "familyValues": "परिवार मूल्य",
+            "familyLocation": "परिवार के स्थान",
+            "lifestyle": "जीवनशैली",
+            "diet": "खानपान",
+            "smoking": "धूम्रपान",
+            "drinking": "शराब सेवन",
+            "privacy": "गोपनीयता सेटिंग",
+            "profileVisibility": "प्रोफाइल दिखाय सेटिंग",
+            "photoVisibility": "फोटो दिखाय सेटिंग",
+            "contactVisibility": "संपर्क दिखाय सेटिंग",
+            "income&about": "आय अउ अपन बारे म",
+            "income": "सालाना आय",
+            "about": "अपन बारे म",
+            "aadharImage": "आधार कार्ड फोटो",
+            "panImage": "पैन कार्ड फोटो",
+            "profilePhotos": "प्रोफाइल फोटो",
+            "prevPhotos": "पहिली के फोटो",
+            "newPhotos": "नवा फोटो",
+            "expectedPartnerIncome": "जीवनसाथी के अपेक्षित आय",
+            "preferredMaritalStatus": "पसंदीदा वैवाहिक स्थिति",
+            "preferredChildren": "पसंदीदा बच्चा स्थिति",
+            "manglikPreference": "मांगलिक पसंद",
+            "ageRange": "पसंदीदा उमर सीमा",
+            "minAge": "न्यूनतम उमर",
+            "maxAge": "अधिकतम उमर",
+            "heightRange": "पसंदीदा लंबाई सीमा",
+            "preferredReligions": "पसंदीदा धर्म",
+            "preferredCastes": "पसंदीदा जाति",
+            "preferredSubCastes": "पसंदीदा उपजाति",
+            "preferredGotras": "पसंदीदा गोत्र",
+            "preferredRaasi": "पसंदीदा राशि",
+            "preferredEducation": "पसंदीदा पढ़ाई",
+            "preferredProfessions": "पसंदीदा पेशा",
+            "preferredLocations": "पसंदीदा स्थान",
+            "to": "ले"
+        },
+        "actions": {
+            "takeImage": "फोटो खींचव",
+            "removeImage": "फोटो हटाव",
+            "selectDob": "जनम तारीख चुनव",
+            "uploadAadhar": "आधार फोटो अपलोड/बदलव",
+            "uploadPan": "पैन कार्ड फोटो अपलोड/बदलव",
+            "addPhotos": "प्रोफाइल फोटो जोड़व"
+        },
+        "sections": {
+            "basic": "मूल जानकारी",
+            "personal": "व्यक्तिगत जानकारी",
+            "background": "पारिवारिक जानकारी",
+            "family": "परिवार अउ जीवनशैली",
+            "partner": "जीवनसाथी पसंद",
+            "photos": "पहचान अउ फोटो"
+        },
+        "optional": "(वैकल्पिक)",
+        "annualIncome": "सालाना आय (जइसे 5 लाख) *",
+        "aboutMe": "अपन बारे म बताव (कम से कम 50 अक्षर)",
+        "aboutMeMin": "‘अपन बारे म’ कम से कम {{min}} अक्षर होना चाही",
+        "placeholders": {
+            "fullName": "अपन पूरा नाव भरव",
+            "email": "अपन ईमेल भरव",
+            "phone": "अपन मोबाइल नंबर भरव",
+            "selectProfileCreator": "कौन प्रोफाइल बना रहे हे चुनव",
+            "selectMaritalStatus": "वैवाहिक स्थिति चुनव",
+            "selectChildren": "बच्चा जानकारी चुनव",
+            "manglikQuestion": "का आप मांगलिक हव?",
+            "selectDate": "तारीख चुनव",
+            "loadingMeta": "जानकारी लोड होवत हे...",
+            "selectReligion": "धर्म चुनव",
+            "selectCaste": "जाति चुनव",
+            "selectSubCasteOptional": "उपजाति चुनव (वैकल्पिक)",
+            "selectGotraOptional": "गोत्र चुनव (वैकल्पिक)",
+            "selectMotherTongue": "मातृभाषा चुनव",
+            "selectRaasiOptional": "राशि चुनव (वैकल्पिक)",
+            "selectProfession": "पेशा चुनव",
+            "selectEducation": "एक या अधिक पढ़ाई चुनव",
+            "searchEducation": "पढ़ाई खोजव...",
+            "selectCurrentLocation": "अभी के स्थान चुनव",
+            "selectFatherStatus": "पिता के स्थिति चुनव",
+            "selectMotherStatus": "माता के स्थिति चुनव",
+            "selectFamilyType": "परिवार प्रकार चुनव",
+            "selectFamilyValues": "परिवार मूल्य चुनव",
+            "selectFamilyLocation": "परिवार के स्थान चुनव",
+            "selectDiet": "खानपान चुनव",
+            "smokingHabit": "धूम्रपान आदत",
+            "drinkingHabit": "शराब सेवन आदत",
+            "profileVisibility": "प्रोफाइल दिखाय सेटिंग",
+            "photoVisibility": "फोटो दिखाय सेटिंग",
+            "contactVisibility": "संपर्क दिखाय सेटिंग",
+            "expectedPartnerIncome": "जीवनसाथी के अपेक्षित आय (जइसे ₹5 लाख/साल)",
+            "minAge": "कम उमर",
+            "maxAge": "ज्यादा उमर",
+            "preferredReligions": "पसंदीदा धर्म चुनव",
+            "preferredCastes": "पसंदीदा जाति चुनव",
+            "preferredSubCastes": "पसंदीदा उपजाति चुनव",
+            "preferredGotras": "पसंदीदा गोत्र चुनव",
+            "preferredRaasi": "पसंदीदा राशि चुनव",
+            "preferredEducation": "पसंदीदा पढ़ाई चुनव",
+            "preferredProfessions": "पसंदीदा पेशा चुनव",
+            "preferredLocations": "पसंदीदा स्थान चुनव"
+        }
+    },
+    "drawer": {
+        "userNameFallback": "यूज़र नाव",
+        "userId": "आईडी",
+        "upgradeMembership": "मेंबरशिप अपग्रेड करव",
+        "offerText": "सभे मेंबरशिप प्लान पर 39% तक के छूट",
+        "profile": "नीचे दिए गे लिंक ले Mor Jodi ऐप इंस्टॉल करव 👇\n{{link}}\n\nमोर प्रोफ़ाइल ID (साइनअप के समय उपयोग करव):\n{{id}}",
+        "menu": {
+            "editProfile": "प्रोफ़ाइल संपादित करव",
+            "likedProfiles": "पसंद के प्रोफ़ाइल",
+            "blockedProfiles": "ब्लॉक के प्रोफ़ाइल",
+            "partnerPreferences": "जीवनसाथी के प्राथमिकता",
+            "searchByUser": "यूज़र आईडी ले खोजव",
+            "wallet": "तुहंर वॉलेट",
+            "referrals": "मोर रेफरल",
+            "accountSettings": "अकाउंट अऊ सेटिंग",
+            "languageSettings": "भाखा सेटिंग",
+            "complaint": "शिकायत / रिपोर्ट करव",
+            "contactUs": "संपर्क करव",
+            "aboutUs": "हमार बारे म",
+            "termsPrivacy": "नियम अऊ गोपनीयता",
+            "logout": "लॉगआउट"
+        },
+        "share": {
+            "installText": "Mor Jodi ला Play Store ले इंस्टॉल करव 👇",
+            "profileIdHint": "मोर प्रोफ़ाइल आईडी (साइन-अप के समय उपयोग करव):"
+        }
+    },
+    "likedProfiles": {
+        "title": "पसंद के प्रोफ़ाइल",
+        "loading": "पसंद के प्रोफ़ाइल लोड होवत हे...",
+        "errorLoad": "पसंद के प्रोफ़ाइल लोड नई हो सकिस।",
+        "empty": {
+            "title": "अभी तक कोनो प्रोफ़ाइल पसंद नई करे गे हे।"
+        },
+        "profile": {
+            "ageUnit": "साल"
+        },
+        "actions": {
+            "unlike": "नापसंद करव"
+        },
+        "alerts": {
+            "openProfileFailed": "प्रोफ़ाइल खोलई म समस्या आइस। किरपा करके फेर ले प्रयास करव।"
+        },
+        "subscription": {
+            "privateProfile": "ये प्रोफ़ाइल निजी (private) हवय। {{name}} ला देखई बर अपन प्लान अपग्रेड करव।",
+            "limitReached": "आप अपन व्यू लिमिट तक पहुँच चुके हव। जारी रखई बर अपग्रेड करव।"
+        }
+    },
+    "about": {
+        "titleFallback": "हमार बारे म",
+        "loading": "जानकारी लोड होवत हे...",
+        "errorLoad": "जानकारी लोड नई हो सकिस।",
+        "empty": "कोनो जानकारी उपलब्ध नई हे।"
+    },
+    "accountSettings": {
+        "options": {
+            "notifications": "सूचना मन",
+            "privacySettings": "गोपनीयता सेटिंग",
+            "deleteAccount": "अकाउंट हटाव"
+        },
+        "delete": {
+            "modalTitle": "अकाउंट हटाय के कारण",
+            "submit": "सबमिट करव",
+            "reasons": {
+                "foundPartner": "मोला ये ऐप म मोर जीवनसाथी मिल गे हे",
+                "notSatisfied": "में ये ऐप ले संतुष्ट नई हव",
+                "gettingMarried": "में बिहाव करे जात हव",
+                "privacyConcern": "मोला गोपनीयता ले संबंधित चिंता हे",
+                "other": "कोनो दोसर कारण"
+            }
+        },
+        "alerts": {
+            "selectReasonErrorTitle": "गलती",
+            "selectReasonErrorMsg": "किरपा करके अकाउंट हटाय के कारण चुनव।",
+            "successTitle": "सफलता",
+            "successMsg": "तुहंर अकाउंट हटाय के अनुरोध भेज दे गे हे।",
+            "errorTitle": "गलती",
+            "genericError": "कुछ गलत हो गे।"
+        }
+    },
+    "activity": {
+        "title": "गतिविधि",
+        "summary": {
+            "interests": "रुचि",
+            "visitors": "विज़िटर",
+            "liked": "पसंद",
+            "blocked": "ब्लॉक"
+        },
+        "sections": {
+            "today": "आज",
+            "yesterday": "कल",
+            "earlier": "पहिली"
+        },
+        "notifications": {
+            "title": "तुहंर सूचना मन",
+            "empty": "कोनो नई सूचना नई हे"
+        },
+        "alerts": {
+            "profileApprovedTitle": "प्रोफ़ाइल स्वीकृत",
+            "profileApprovedMsg": "तुहंर प्रोफ़ाइल एडमिन द्वारा स्वीकृत कर दे गे हे।",
+            "openProfileErrorTitle": "गलती",
+            "openProfileErrorMsg": "प्रोफ़ाइल खोलई म समस्या आइस। किरपा करके फेर ले प्रयास करव।"
+        },
+        "upgradeVisitors": "यह देखई बर कि कउन तुहंर प्रोफ़ाइल देखिस, किरपा करके अपन प्लान अपग्रेड करव।"
+    },
+    "advancedSearch": {
+        "title": "खोज फ़िल्टर",
+        "sections": {
+            "ageHeight": "आयु अऊ लंबाई",
+            "background": "पृष्ठभूमि"
+        },
+        "labels": {
+            "heightRange": "लंबाई",
+            "annualIncome": "वार्षिक आय"
+        },
+        "units": {
+            "to": "से",
+            "cm": "सेमी"
+        },
+        "filters": {
+            "religion": "धर्म",
+            "caste": "जाति",
+            "subCaste": "उप-जाति",
+            "gotra": "गोत्र",
+            "motherTongue": "मातृभाखा",
+            "raasi": "राशि",
+            "location": "स्थान",
+            "maritalStatus": "वैवाहिक स्थिति",
+            "children": "लइका",
+            "manglik": "मांगलिक",
+            "education": "शिक्षा",
+            "profession": "पेशा",
+            "diet": "आहार",
+            "smoking": "धूम्रपान",
+            "drinking": "शराब सेवन",
+            "familyType": "परिवार के प्रकार",
+            "familyValues": "पारिवारिक मूल्य"
+        },
+        "placeholders": {
+            "minAge": "न्यूनतम आयु",
+            "maxAge": "अधिकतम आयु",
+            "annualIncome": "वार्षिक आय दर्ज करव",
+            "religion": "धर्म चुनव",
+            "caste": "जाति चुनव",
+            "subCaste": "उप-जाति चुनव",
+            "gotra": "गोत्र चुनव",
+            "motherTongue": "मातृभाखा चुनव",
+            "raasi": "राशि चुनव",
+            "location": "स्थान चुनव",
+            "maritalStatus": "वैवाहिक स्थिति चुनव",
+            "children": "लइका मन के स्थिति चुनव",
+            "manglik": "मांगलिक चुनव",
+            "education": "शिक्षा चुनव",
+            "profession": "पेशा चुनव",
+            "diet": "आहार चुनव",
+            "smoking": "धूम्रपान के आदत चुनव",
+            "drinking": "शराब सेवन चुनव",
+            "familyType": "परिवार के प्रकार चुनव",
+            "familyValues": "पारिवारिक मूल्य चुनव",
+            "searchDropdown": "खोजव..."
+        },
+        "options": {
+            "neverMarried": "कभू शादी नई हुई",
+            "divorced": "तलाकशुदा",
+            "widowed": "विधवा / विधुर",
+            "noChildren": "कोनो लइका नई",
+            "oneChild": "1 लइका",
+            "twoChildren": "2 लइका",
+            "threePlusChildren": "3+ लइका",
+            "yes": "हाँ",
+            "no": "नई",
+            "veg": "शाकाहारी",
+            "nonVeg": "मांसाहारी",
+            "nuclear": "एकल परिवार",
+            "joint": "संयुक्त परिवार"
+        },
+        "buttons": {
+            "search": "प्रोफ़ाइल खोजव"
+        },
+        "messages": {
+            "loadingMeta": "विकल्प लोड होवत हे...",
+            "metaError": "मेटाडेटा लोड नई हो सकिस।",
+            "noResults": "तुहंर फ़िल्टर ले कोनो प्रोफ़ाइल नई मिलिस।"
+        }
+    },
+    "profiles": {
+        "empty": "यहां कोनो प्रोफ़ाइल उपलब्ध नई हे।",
+        "loading": "प्रोफ़ाइल लोड होवत हे..."
+    },
+    "blockedProfiles": {
+        "empty": "कोनो ब्लॉक करे गे प्रोफ़ाइल नई हे।",
+        "age": "साल",
+        "unblock": {
+            "title": "उपयोगकर्ता ला अनब्लॉक करव",
+            "confirm": "का आप वाकई {{name}} ला अनब्लॉक करना चाहत हव?",
+            "cancel": "रद्द करव",
+            "action": "अनब्लॉक"
+        }
+    },
+    "profile": {
+        "private": "ये प्रोफ़ाइल निजी (private) हवय। {{name}} ला देखई बर अपग्रेड करव।",
+        "limitReached": "आप अपन व्यू लिमिट तक पहुँच चुके हव।",
+        "openError": "प्रोफ़ाइल खोलई म समस्या आइस।",
+        "photoLimitReached": "आप अपन दैनिक फोटो व्यू सीमा तक पहुँच चुके हव। फोटो देखई जारी रखे बर अपग्रेड करव।",
+        "photoFeatureNotAvailable": "फोटो व्यू फीचर तुहंर अभी के प्लान म उपलब्ध नई हे।",
+        "photoSubscriptionRequired": "ए फोटो मन ला देखई बर सक्रिय सदस्यता जरूरी हे।"
+    },
+    "complaint": {
+        "title": "तुहंर शिकायत मन",
+        "empty": "अभी तक कोनो शिकायत दर्ज नई करे गे हे।",
+        "typeLabel": "शिकायत के प्रकार",
+        "typePlaceholder": "शिकायत के प्रकार चुनव",
+        "typeGeneral": "सामान्य शिकायत",
+        "typeUser": "उपयोगकर्ता के रिपोर्ट करव",
+        "reportedUserLabel": "रिपोर्ट करे गे उपयोगकर्ता के आईडी",
+        "reportedUserPlaceholder": "रिपोर्ट करे बर उपयोगकर्ता आईडी दर्ज करव",
+        "subjectLabel": "विषय",
+        "subjectPlaceholder": "विषय",
+        "messageLabel": "संदेश",
+        "messagePlaceholder": "संदेश",
+        "pickImage": "चित्र चुनव",
+        "submit": "शिकायत दर्ज करव",
+        "successTitle": "सफल",
+        "successMsg": "तुहंर शिकायत सफलतापूर्वक दर्ज कर ले गे हे।",
+        "errorTitle": "गलती",
+        "errorFill": "किरपा करके सभे फ़ील्ड भरव।",
+        "errorUserId": "किरपा करके रिपोर्ट करे वाला उपयोगकर्ता के आईडी दर्ज करव।",
+        "errorFetch": "तुहंर शिकायत मन लाय म विफल।",
+        "errorSubmit": "शिकायत दर्ज करत समय कोनो गलती हुई।",
+        "status": {
+            "label": "स्थिति",
+            "open": "खुली",
+            "inProgress": "प्रगति म",
+            "closed": "बंद"
+        },
+        "adminResponse": "प्रशासक के प्रतिक्रिया",
+        "submittedOn": "जमा करे के तारीख",
+        "reportedUser": "रिपोर्ट करे गे उपयोगकर्ता"
+    },
+    "contact": {
+        "errorLoad": "संपर्क जानकारी लोड करे म विफल।",
+        "email": "ईमेल",
+        "phone": "फ़ोन",
+        "address": "पता",
+        "na": "उपलब्ध नई हे",
+        "empty": "कोनो संपर्क जानकारी उपलब्ध नई हे।",
+        "limitReached": "आप मन रोज के संपर्क देखे के सीमा तक पहुँच गेय हव। आगे बढ़े बर अपग्रेड करव।"
+    },
+    "idSearch": {
+        "title": "यूज़र आईडी ले खोजव",
+        "inputPlaceholder": "यूज़र आईडी दर्ज करव",
+        "search": "खोजव",
+        "errorTitle": "गलती",
+        "invalidId": "किरपा करके मान्य यूज़र आईडी दर्ज करव",
+        "noUserTitle": "कोनो उपयोगकर्ता नई मिलिस",
+        "noUserDesc": "ये आईडी ले कोनो प्रोफ़ाइल नई मिलिस।"
+    },
+    "interest": {
+        "tabs": {
+            "received": "प्राप्त",
+            "sent": "भेजे गे"
+        },
+        "age": "साल",
+        "empty": {
+            "received": "अभी तक कोनो रुचि प्राप्त नई हुई हे।",
+            "sent": "अभी तक कोनो रुचि भेजी नई गई हे।"
+        },
+        "actions": {
+            "accept": "स्वीकार करव",
+            "decline": "अस्वीकार करव",
+            "unsend": "वापस लेव",
+            "remove": "हटाव",
+            "sendAgain": "फेर ले भेजव",
+            "cancel": "रद्द करव",
+            "confirm": "पुष्टि करव",
+            "respond": "प्रतिक्रिया देव"
+        },
+        "alerts": {
+            "unsendTitle": "रुचि हटाव?",
+            "unsendMsg": "का आप अपन रुचि हटाना चाहत हव?",
+            "respondMsg": "आप कइसने प्रतिक्रिया देना चाहत हव?",
+            "removeTitle": "रुचि हटाव?",
+            "removeMsg": "इससे आपसी स्वीकृत रुचि हट जायही।",
+            "sendAgainTitle": "फेर ले भेजव?",
+            "sendAgainMsg": "ये उपयोगकर्ता ह पहिली मना करे रिहिस। का फेर ले भेजव?",
+            "acceptConfirm": "का आप ये रुचि ला स्वीकार करना चाहत हव?",
+            "declineConfirm": "का आप ये रुचि ला अस्वीकार करना चाहत हव?",
+            "limitReached": "आप अपन दैनिक रुचि सीमा तक पहुँच चुके हव। जारी रखे बर अपग्रेड करव।"
+        }
+    },
+    "common": {
+        "success": "सफलता",
+        "error": "गलती",
+        "age": "उम्र",
+        "height": "लंबाई",
+        "children": "लइका",
+        "maritalStatus": "वैवाहिक स्थिति",
+        "raasi": "राशि",
+        "diet": "खान-पान",
+        "drinking": "मद्यपान",
+        "smoking": "धूम्रपान",
+        "aboutMe": "मोर बारे म",
+        "motherTongue": "मातृभाखा",
+        "education": "पढ़ई",
+        "profession": "काम",
+        "location": "जगह",
+        "expectedIncome": "अपेक्षित आमदनी",
+        "caste": "जाति",
+        "subCaste": "उप-जाति",
+        "gotra": "गोत्र",
+        "notice": "सूचना",
+        "okGotIt": "ठीक हे"
+    },
+    "actionGuard": {
+        "accountPendingTitle": "खाता लंबित",
+        "accountPendingMessage": "तुहंर खाता अभी एडमिन समीक्षा म हे। मंजूरी के बाद आप ये फीचर के उपयोग कर सकहूँ।",
+        "premiumFeatureTitle": "प्रीमियम फीचर",
+        "premiumFeatureMessage": "ये फीचर केवल प्रीमियम सदस्य मन बर उपलब्ध हे। अभी अपग्रेड करव।",
+        "ok": "ठीक हे",
+        "upgrade": "अपग्रेड",
+        "cancel": "रद्द करव"
+    },
+    "upgrade": {
+        "title": "सदस्यता अपग्रेड करव",
+        "needHelp": "मदद चाही?",
+        "month": "{{count}} महीना",
+        "walletBalance": "वॉलेट बैलेंस: ₹{{amount}}",
+        "finalPayable": "अंतिम भुगतान: ₹{{amount}}",
+        "activePlanDetails": "सक्रिय प्लान के विवरण",
+        "plan": "प्लान",
+        "activatedOn": "शुरू के तारीख",
+        "expiresOn": "खतम होय के तारीख",
+        "currentPlan": "अभी के प्लान",
+        "activate": "सक्रिय करव",
+        "upgrade": "अपग्रेड करव",
+        "pay": "₹{{amount}} भुगतान करव",
+        "needHelpTitle": "प्लान चुने म मदद चाही?",
+        "needHelpSubtitle": "हमार टीम तुहंर बर सही प्लान चुने म मदद करही।",
+        "callUs": "कॉल करव",
+        "emailUs": "ईमेल करव",
+        "features": "विशेषता",
+        "coupon": {
+            "title": "कूपन लागू करव",
+            "placeholder": "कूपन कोड दर्ज करव",
+            "apply": "लागू करव",
+            "remove": "हटाव",
+            "applied": "लागू हो गे",
+            "appliedCode": "लागू हो गे: {{code}}",
+            "discountApplied": "कूपन छूट: ₹{{amount}}",
+            "enterCode": "किरपा करके कूपन कोड दर्ज करव।",
+            "notAvailable": "ये प्लान बर कूपन उपलब्ध नई हे।",
+            "applyFailed": "कूपन लागू करे म विफल।"
+        },
+        "common": {
+            "error": "गलती",
+            "success": "सफलता",
+            "sessionExpired": "सत्र खतम हो गे"
+        },
+        "alerts": {
+            "loginFirst": "किरपा करके पहिली लॉगिन करव।",
+            "selectPlan": "किरपा करके पहिली एक प्लान चुनव।",
+            "freePlanActivated": "फ्री प्लान सफलतापूर्वक सक्रिय हो गे!",
+            "freePlanFailed": "फ्री प्लान सक्रिय करे म विफल।",
+            "walletSuccess": "वॉलेट ले सदस्यता सक्रिय हो गे।",
+            "paymentSuccess": "सदस्यता सफलतापूर्वक सक्रिय हो गे!",
+            "paymentFailed": "भुगतान विफल हो गे। किरपा करके फेर प्रयास करव।",
+            "loginAgain": "किरपा करके फेर ले लॉगिन करव।",
+            "planLoadFailed": "प्लान लोड करे म विफल।"
+        },
+        "month_one": "1 महीना",
+        "section": {
+            "planDuration": "प्लान के समय",
+            "billing": "बिलिंग"
+        },
+        "billing": {
+            "summary": "बिलिंग सारांश",
+            "planTotal": "प्लान के कुल",
+            "couponDiscount": "कूपन छूट",
+            "useWallet": "वॉलेट के उपयोग करव",
+            "finalPayable": "अंतिम देय राशि",
+            "duration": "समय: {{count}} दिन"
+        },
+        "activeBadge": "सक्रिय"
+    },
+    "headers": {
+        "editProfile": "प्रोफ़ाइल संपादित करव",
+        "accountSettings": "अकाउंट सेटिंग",
+        "languageSettings": "भाखा सेटिंग",
+        "privacySettings": "गोपनीयता सेटिंग",
+        "notificationSettings": "सूचना सेटिंग",
+        "idWiseSearch": "आईडी ले खोज",
+        "likedProfiles": "पसंद के प्रोफ़ाइल",
+        "blockedProfiles": "ब्लॉक के प्रोफ़ाइल",
+        "profileVisitors": "प्रोफ़ाइल विज़िटर",
+        "interestRequests": "रुचि अनुरोध",
+        "complaint": "शिकायत बॉक्स",
+        "wallet": "वॉलेट",
+        "referral": "रेफरल",
+        "termsPrivacy": "नियम अऊ गोपनीयता",
+        "about": "हमार बारे म",
+        "contact": "संपर्क करव",
+        "login": "लॉगिन",
+        "otpVerification": "ओटीपी सत्यापन",
+        "otpVerify": "ओटीपी सत्यापन"
+    },
+    "languageSetting": {
+        "language": "भाखा सेटिंग",
+        "english": "अंग्रेजी",
+        "hindi": "हिंदी",
+        "chhattisgarhi": "छत्तीसगढ़ी"
+    },
+    "privacy": {
+        "profileVisibility": "प्रोफ़ाइल दृश्यता",
+        "photoVisibility": "फोटो दृश्यता",
+        "contactVisibility": "संपर्क दृश्यता",
+        "public": "सार्वजनिक",
+        "private": "निजी",
+        "save": "सेटिंग सहेजव",
+        "success": "गोपनीयता सेटिंग अपडेट हो गे।",
+        "error": "कुछ गलत हो गे।"
+    },
+    "notifications": {
+        "title": "पुश नोटिफिकेशन",
+        "receive": "नोटिफिकेशन प्राप्त करव",
+        "description": "ऐप ले नोटिफिकेशन प्राप्त करे बर इल चालू करव।",
+        "save": "सेटिंग सहेजव",
+        "success": "नोटिफिकेशन सेटिंग अपडेट हो गे।",
+        "error": "कुछ गलत हो गे।"
+    },
+    "tabs": {
+        "home": "होम",
+        "matches": "मैच",
+        "activity": "गतिविधि",
+        "messenger": "मैसेंजर",
+        "upgrade": "अपग्रेड"
+    },
+    "header": {
+        "home": "होम",
+        "activity": "गतिविधि",
+        "notifications": "सूचना मन"
+    },
+    "wallet": {
+        "balance": "बैलेंस",
+        "transactionHistory": "लेन-देन के इतिहास",
+        "noTransactions": "अभी कोनो लेन-देन नई हे।"
+    },
+    "referral": {
+        "history": "रेफरल इतिहास",
+        "noReferrals": "अभी कोनो रेफरल नई हे।",
+        "shareMessage": "नीचे दिए गे लिंक ले Mor Jodi ऐप इंस्टॉल करव:\n{{link}}\n\nमोर रेफरल कोड: {{code}}\nसाइनअप के समय ये कोड के उपयोग करव 🎁"
+    },
+    "premium": {
+        "title": "प्रीमियम मैच ({{count}})",
+        "empty": "कोनो प्रीमियम प्रोफ़ाइल उपलब्ध नई हे"
+    },
+    "nearby": {
+        "title": "आस-पास के मैच ({{count}})",
+        "empty": "कोनो नजदीकी मैच नई मिलिस"
+    },
+    "follow": {
+        "title": "हमन ला फॉलो करव",
+        "platforms": {
+            "facebook": "फेसबुक",
+            "twitter": "ट्विटर",
+            "instagram": "इंस्टाग्राम",
+            "linkedin": "लिंक्डइन",
+            "youtube": "यूट्यूब",
+            "whatsapp": "व्हाट्सएप"
+        }
+    },
+    "app": {
+        "name": "मोर जोड़ी"
+    },
+    "customeHeaders": {
+        "home": "होम",
+        "messenger": "संदेश",
+        "matches": "मैच",
+        "activity": "गतिविधि"
+    },
+    "messenger": {
+        "empty": "अभी कोनो संदेश नई हे",
+        "noMessages": "कोनो संदेश नई"
+    },
+    "commonmessanger": {
+        "you": "आप",
+        "image": "फोटो"
+    },
+    "matchTabs": {
+        "all": "सभे",
+        "verified": "सत्यापित",
+        "yourmatches": "तुहंर मैच",
+        "nearby": "आस-पास",
+        "justjoined": "नवा जुड़े"
+    },
+    "nearby2": {
+        "title": "आस-पास के प्रोफ़ाइल",
+        "empty": "आस-पास कोनो प्रोफ़ाइल नई मिलिस"
+    },
+    "yourMatches": {
+        "empty": "कोनो मैचिंग प्रोफ़ाइल नई मिलिस।"
+    },
+    "justJoined": {
+        "empty": "कोनो नवा प्रोफ़ाइल नई मिलिस।"
+    },
+    "verified": {
+        "empty": "कोनो सत्यापित प्रोफ़ाइल उपलब्ध नई हे"
+    },
+    "subscriptionModel": {
+        "upgrade_required": "अपग्रेड जरूरी हे",
+        "view_plans": "प्लान देखव",
+        "subscription_default": "आप ला {{name}} देखे बर सक्रिय सदस्यता जरूरी हवय।",
+"message_limit_reached": "आप मन अपन रोज के संदेश सीमा तक पहुंच गे हवव। जादा संदेश भेजे बर अपन प्लान ला अपग्रेड करव।",
+"image_premium_required": "फोटो भेजना सिरिफ प्रीमियम सुविधा हवय। फोटो भेजे बर अपन प्लान ला अपग्रेड करव।"
+    },
+    "profileDetail": {
+        "contact": "संपर्क",
+        "tabs": {
+            "about": "बारे म",
+            "family": "परिवार",
+            "lookingFor": "खोजत हे",
+            "match": "मैच"
+        },
+        "about": "बारे म",
+        "aboutMe": "मोर बारे म",
+        "familySection": "परिवार",
+        "lookingForSection": "खोजत हे",
+        "matchSection": "मैच",
+        "age": "उम्र",
+        "height": "लंबाई",
+        "religion": "धर्म",
+        "caste": "जाति",
+        "subCaste": "उपजाति",
+        "maritalStatus": "वैवाहिक स्थिति",
+        "children": "लइका",
+        "raasi": "राशि",
+        "diet": "खान-पान",
+        "drinking": "शराब",
+        "smoking": "धूम्रपान",
+        "motherTongue": "मातृभाखा",
+        "education": "पढ़ई",
+        "profession": "काम",
+        "location": "जगह",
+        "expectedIncome": "अपेक्षित आमदनी",
+        "fatherStatus": "ददा के स्थिति",
+        "motherStatus": "मइया के स्थिति",
+        "familyType": "परिवार के प्रकार",
+        "familyValues": "पारिवारिक मूल्य",
+        "brothers": "भइया",
+        "sisters": "बहनी",
+        "familyLocation": "परिवार के जगह",
+        "ageRange": "उम्र सीमा",
+        "heightRange": "लंबाई सीमा",
+        "preferredLocation": "पसंदीदा जगह",
+        "preferredIncome": "पसंदीदा आमदनी",
+        "matchTitle": "मैच",
+        "matchUnavailable": "मैच उपलब्ध नई हे। किरपा करके बाद म फेर प्रयास करव।",
+        "matchedCriteriaTitle": "मैचिंग मानदंड:",
+        "unmatchedCriteriaTitle": "नइ मिले मानदंड:",
+        "noMatchingCriteria": "कोनो मैचिंग मानदंड उपलब्ध नई हे।",
+        "noUnmatchedCriteria": "सब मानदंड मैच होवत हे।",
+        "partnerPreferenceIncomplete": "बेहतर मैच रिजल्ट बर अपन जीवनसाथी पसंद पूरा करव।",
+        "updatePartnerPreferenceButton": "पसंद अपडेट करव"
+    },
+    "languageSelect": {
+        "brand": "मोर जोड़ी",
+        "tagline": "अपन मनपसंद भाखा चुनव।",
+        "title": "भाखा",
+        "subtitle": "ऐप चालू करे बर एक भाखा चुनव।",
+        "continue": "आगे बढ़व"
+    },
+    "partnerPreferences": {
+        "sections": {
+            "agePreference": "उम्र पसंद",
+            "heightPreference": "लंबाई पसंद",
+            "basicPreferences": "मूल पसंद",
+            "backgroundPreferences": "पृष्ठभूमि पसंद"
+        },
+        "labels": {
+            "minAge": "कम से कम उम्र",
+            "maxAge": "ज्यादा से ज्यादा उम्र",
+            "minHeight": "कम से कम लंबाई",
+            "maxHeight": "ज्यादा से ज्यादा लंबाई"
+        },
+        "placeholders": {
+            "expectedIncome": "जैसे: 5 लाख / साल"
+        },
+        "actions": {
+            "save": "पसंद सहेजव"
+        },
+        "success": {
+            "updated": "जीवनसाथी के पसंद सफलतापूर्वक अपडेट होगे।"
+        },
+        "error": {
+            "updateFailed": "जीवनसाथी के पसंद अपडेट करे मं दिक्कत आइस।"
+        },
+        "validation": {
+            "minAgeMaxAge": "कम से कम उम्र, ज्यादा से ज्यादा उम्र ले जादा नई हो सकय।",
+            "minHeightMaxHeight": "कम से कम लंबाई, ज्यादा से ज्यादा लंबाई ले जादा नई हो सकय।"
+        }
+    },
+    "visitors": {
+        "noAccess": "कौन तुमार प्रोफाइल देखे हे, ये देखे बर अपन प्लान ला अपग्रेड करव।",
+        "subscription_default": "ये सुविधा सिरिफ प्रीमियम सदस्य मन बर हे। अपन प्लान ला अपग्रेड करव।",
+        "limitReached": "आज के विज़िटर देखे के सीमा पूरा होगे हे। आगे देखे बर अपन प्लान ला अपग्रेड करव।",
+        "loadError": "विज़िटर लोड नई हो पाइस। फेर से कोसिस करव।",
+        "title": "प्रोफाइल विज़िटर",
+        "description": "देखव कऊन तुमार प्रोफाइल देखे हे।"
+    },
+    "messageScreen": {
+        "user": "उपयगकरत",
+        "textHere": "इह लखव",
+        "permissionRequired": "अनुमति जरूरी हे",
+        "allowPhotoAccess": "फोटो भेजे बर कृपया फोटो एक्सेस के अनुमति देव।",
+        "error": "गलत",
+        "unableToOpenGallery": "गलर नई खल पइस",
+        "unableToSelectImage": "फट चन म दककत आइस",
+        "notice": "सचन",
+        "unableToSendMessage": "सदेश नई भेजा जा सकय।",
+        "failedToSendMessage": "संदेश भेजे मं दिक्कत आइस।",
+        "unableToOpenProfile": "प्रोफाइल खोले मं दिक्कत आइस।"
+    },
+    "messengerScreen": {
+        "searchChats": "चट खजव",
+        "all": "सब",
+        "unread": "अनपढ",
+        "matches": "मच",
+        "activeNow": "अभी सक्रिय",
+        "noMessages": "अभी कोई संदेश नई ह",
+        "you": "तम: ",
+        "image": "[फट]",
+        "noUnreadChats": "कई अनपढ चट नई ह",
+        "noMatchesYet": "अभ कई मच नई ह",
+        "user": "उपयोगकर्ता"
+    },
+    "activityScreen": {
+        "requests": "अनरध",
+        "visitors": "वजटर",
+        "liked": "पसंद करे",
+        "blocked": "ब्लॉक करे",
+        "activityTab": "गतवध",
+        "visitorsTab": "वजटर",
+        "filterAll": "सब",
+        "filterUnread": "अनपढ",
+        "filterRead": "पढ हए",
+        "noVisitors": "अभी तक कऊनो तुमार प्रोफाइल नई देखे।",
+        "retry": "फेर कोसिस करव",
+        "notice": "सूचना",
+        "cannotOpen": "तुम अभी ये प्रोफाइल नई खोल सकव।",
+        "unableToOpen": "प्रोफाइल खोले मं दिक्कत आइस फर कसस करव",
+        "failedToLoad": "वजटर लड नई ह पइस"
+    },
+    "editProfileProgress": {
+        "title": "प्रोफाइल अपडेट होवत हे",
+        "completed": "पूरा",
+        "body": "तुमर डाटा अपडेट होवत हे अऊ फोटो अपलोड होवत हे।\nकृपया पूरा होए तक रूके रहव।",
+        "note": "नोट: लगय समय तुमर इंटरनेट स्पीड ऊपर निर्भर करथे।"
+    }
+}

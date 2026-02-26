@@ -24,7 +24,8 @@ const SelectionModal = ({
     selectedValue,
     searchable = false,
     onRequestAdd,
-    multiSelect = false
+    multiSelect = false,
+    allowDeselectSingle = false,
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredOptions, setFilteredOptions] = useState(options);
@@ -71,7 +72,11 @@ const SelectionModal = ({
             }
             onSelect(newSelection);
         } else {
-            onSelect(value);
+            if (allowDeselectSingle && selectedValue === value) {
+                onSelect('');
+            } else {
+                onSelect(value);
+            }
             onClose();
         }
     };

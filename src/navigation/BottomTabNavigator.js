@@ -97,7 +97,7 @@ const BottomTabNavigator = () => {
                 {route.name === 'Messenger' && totalUsersWithMessages > 0 && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
-                      {totalUsersWithMessages}
+                      {totalUsersWithMessages > 99 ? '99+' : totalUsersWithMessages}
                     </Text>
                   </View>
                 )}
@@ -150,12 +150,13 @@ const styles = StyleSheet.create({
     top: -4,
     backgroundColor: COLORS.primary,
     borderRadius: 8,
-    width: 16,
+    minWidth: 16,
     height: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#ffffff',
+    paddingHorizontal: 3,
   },
   badgeText: {
     color: COLORS.white,

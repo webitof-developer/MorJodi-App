@@ -16,6 +16,7 @@ import DeviceInfo from 'react-native-device-info';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../redux/actions/authActions';
+import { fetchUnreadNotificationCount, fetchUnreadUserNotificationCount } from '../redux/slices/notificationSlice';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import { API_BASE_URL } from '../constants/config';
 import i18n from '../localization/i18n';
@@ -25,6 +26,7 @@ import { getImageUrl } from '../utils/imageUtils';
 const CustomDrawerContent = props => {
   const { user, token } = useSelector(state => state.auth);
   const { subscription } = useSelector(state => state.subscription);
+  const { unreadCount } = useSelector(state => state.notifications);
   const [referralCode, setReferralCode] = useState('');
   const [profilePrefix, setProfilePrefix] = useState('MJ');
   const dispatch = useDispatch();
@@ -76,6 +78,12 @@ const CustomDrawerContent = props => {
     };
     if (token) fetchReferralData();
   }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    dispatch(fetchUnreadNotificationCount());
+    dispatch(fetchUnreadUserNotificationCount());
+  }, [token, dispatch]);
 
   useEffect(() => {
     const fetchPrefix = async () => {
@@ -273,8 +281,8 @@ Note: Tap the referral link to install and your referral code fills automaticall
           <SectionHeader title="Discovery" />
 
           <MenuItem
-            label={i18n.t('drawer.menu.partnerPreferences')}
-            icon="sliders"
+            label={i18n.t('matchTabs.yourmatches')}
+            icon="users"
             onPress={() => {
               props.navigation.closeDrawer();
               props.navigation.navigate('HomeTabs', {
@@ -283,6 +291,7 @@ Note: Tap the referral link to install and your referral code fills automaticall
               });
             }}
           />
+          
           <MenuItem
             label={i18n.t('drawer.menu.searchByUser')}
             icon="search"
@@ -293,11 +302,23 @@ Note: Tap the referral link to install and your referral code fills automaticall
             icon="heart"
             onPress={() => props.navigation.navigate('LikedProfiles')}
           />
+         <MenuItem
+            label={i18n.t('drawer.menu.blockedProfiles')}
+            icon="slash"
+            onPress={() => props.navigation.navigate('BlockedProfiles')}
+          />
 
           {/* Settings & Support */}
           <View style={styles.divider} />
           <SectionHeader title="Settings & Support" />
-
+<MenuItem
+            label={i18n.t('drawer.menu.partnerPreferences')}
+            icon="sliders"
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('PartnerPreferenceSettings');
+            }}
+          />
           <MenuItem
             label={i18n.t('drawer.menu.accountSettings')}
             icon="settings"
@@ -308,11 +329,7 @@ Note: Tap the referral link to install and your referral code fills automaticall
             icon="globe"
             onPress={() => props.navigation.navigate('LanguageSettings')}
           />
-          <MenuItem
-            label={i18n.t('drawer.menu.blockedProfiles')}
-            icon="slash"
-            onPress={() => props.navigation.navigate('BlockedProfiles')}
-          />
+        
           <MenuItem
             label={i18n.t('drawer.menu.complaint')}
             icon="alert-circle"
@@ -552,6 +569,21 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     fontFamily: 'Poppins-Medium',
     color: COLORS.darkGray,
+  },
+  drawerBadgeContainer: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    paddingHorizontal: 5,
+  },
+  drawerBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: '700',
   },
 
   divider: {

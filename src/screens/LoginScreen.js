@@ -70,17 +70,17 @@ const LoginScreen = ({ navigation }) => {
   // LOGIN - SEND OTP
   const handleLogin = async () => {
     if (!loginType) {
-      showAlert('Invalid method', i18n.t('auth.loginModeUnavailable'));
+      showAlert(i18n.t('auth.invalidMethodTitle'), i18n.t('auth.loginModeUnavailable'));
       return;
     }
 
     if (loginType === 'email' && !email.trim()) {
-      return showAlert('Invalid email', i18n.t('auth.enterEmail'));
+      return showAlert(i18n.t('auth.invalidEmailTitle'), i18n.t('auth.enterEmail'));
     }
     if (loginType === 'phone') {
       const digits = phoneNumber.replace(/[^0-9]/g, '');
       if (!digits || digits.length < 10) {
-        return showAlert('Invalid number', i18n.t('auth.enterPhone'));
+        return showAlert(i18n.t('auth.invalidNumberTitle'), i18n.t('auth.enterPhone'));
       }
     }
 
@@ -99,7 +99,7 @@ const LoginScreen = ({ navigation }) => {
         type: 'login',
       });
     } catch (error) {
-      showAlert('Invalid request', i18n.t('auth.somethingWentWrong'));
+      showAlert(i18n.t('auth.invalidRequestTitle'), i18n.t('auth.somethingWentWrong'));
     } finally {
       setLoading(false);
     }
@@ -121,14 +121,14 @@ const LoginScreen = ({ navigation }) => {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.hero}>
-          <Text style={styles.brand}>Mor Jodi</Text>
-          <Text style={styles.tagline}>Find your match without friction.</Text>
+          <Text style={styles.brand}>{i18n.t('app.name')}</Text>
+          <Text style={styles.tagline}>{i18n.t('auth.loginTagline')}</Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.title}>{i18n.t('auth.login')}</Text>
           <Text style={styles.subtitle}>
-            Choose how you want to sign in and we will send you a one-time code.
+            {i18n.t('auth.loginSubtitle')}
           </Text>
 
           <View style={styles.toggleRow}>
@@ -205,7 +205,7 @@ const LoginScreen = ({ navigation }) => {
                 <TextInput
                   style={[styles.input, loginType === 'phone' && styles.inputPhone]}
                   placeholder={
-                    loginType === 'email' ? i18n.t('auth.enterEmail') : i18n.t('auth.enterMobile')
+                    loginType === 'email' ? i18n.t('auth.enterEmail') : i18n.t('auth.enterPhone')
                   }
                   placeholderTextColor={COLORS.darkGray}
                   value={loginType === 'email' ? email : phoneNumber}
@@ -218,7 +218,7 @@ const LoginScreen = ({ navigation }) => {
                 />
               </View>
               <Text style={styles.helper}>
-                We will text you a one-time code to keep your account secure.
+                {i18n.t('auth.loginHelper')}
               </Text>
             </View>
           )}

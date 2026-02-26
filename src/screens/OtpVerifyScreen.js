@@ -292,6 +292,7 @@ const OtpVerifyScreen = ({ route, navigation }) => {
                 maxLength={1}
                 returnKeyType="done"
                 textAlign="center"
+                allowFontScaling={false}
                 autoFocus={index === 0}
               />
             ))}
@@ -369,7 +370,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.white,
     borderRadius: SIZES.radius * 1.5,
-    padding: SIZES.padding,
+    padding: 20, // Reduced from 24 for more horizontal room
     shadowColor: '#eaeaeaff',
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -397,21 +398,26 @@ const styles = StyleSheet.create({
 
   otpContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center', // Center group to avoid overlap with edges
     marginBottom: SIZES.padding,
-    gap: 8,
+    width: '100%',
   },
 
   otpInput: {
     flex: 1,
-    aspectRatio: 1,
-    maxWidth: 50,
-    borderWidth: 1,
+    height: 48,
+    marginHorizontal: 2,
+    borderWidth: 1.5,
     borderRadius: SIZES.radius,
-    ...FONTS.h3,
+    fontSize: 16,
+    fontWeight: '700',
     color: COLORS.black,
     backgroundColor: '#fafafa',
     textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
   },
 
   verifyBtn: {

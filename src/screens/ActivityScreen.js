@@ -9,9 +9,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SectionList,
-  Image,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import CustomHeader from '../components/CustomHeader';
 import { useSelector, useDispatch } from 'react-redux';
@@ -20,135 +18,147 @@ import {
   fetchNotifications,
   markOneNotificationAsRead,
   fetchUnreadNotificationCount,
+  fetchUnreadUserNotificationCount,
 } from '../redux/slices/notificationSlice';
 import { fetchUnreadMessageCount } from '../redux/slices/messageSlice';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
 import moment from 'moment';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import i18n from '../localization/i18n';
 import axios from 'axios';
 import { API_BASE_URL } from '../constants/config';
 import SkeletonActivity from '../components/SkeletonActivity';
+import { useProfileActions } from '../contexts/ProfileActionsContext';
+import SubscriptionModal from '../components/SubscriptionModal';
+import { LanguageContext } from '../contexts/LanguageContext';
 
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Screen
+// ─────────────────────────────────────────────────────────────────────────────
 const ActivityScreen = ({ navigation }) => {
   const dispatch = useDispatch();
-  const { token } = useSelector(state => state.auth);
-  const { notifications, loading, hasMore, currentPage } = useSelector(state => state.notifications);
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread' | 'read'
+  const { token } = useSelector((state) => state.auth);
+  const { notifications, loading, hasMore, currentPage } = useSelector(
+    (state) => state.notifications,
+  );
+  const { language } = useContext(LanguageContext);
+  const t = (key, opts) => i18n.t(key, { locale: language, ...opts });
 
-  // Context Hooks
+  // Context
   const { receivedInterests } = useInterest();
   const { likedProfiles } = useLike();
   const { blockedProfiles } = useBlock();
 
-  // Local State
+  // Notification filter
+  const [activeFilter, setActiveFilter] = useState('all');
+
+  // Visitor count for the stats card
   const [visitorCount, setVisitorCount] = useState(0);
 
-  // ------------------------------------------------------------------
-  // 1. DATA FETCHING
-  // ------------------------------------------------------------------
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchVisitorCount = async () => {
+  // ── useProfileActions (item=null) ──
+  const {
+    openProfileById,
+    handleViewVisitors,
+    subscriptionModalVisible,
+    subscriptionModalMessage,
+    setSubscriptionModalVisible,
+    handleSubscriptionUpgrade,
+  } = useProfileActions(null);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Data Fetching
+  // ─────────────────────────────────────────────────────────────────────────
+  const fetchVisitorCount = useCallback(async () => {
+    if (!token) return;
     try {
-      if (token) {
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        const response = await axios.get(`${API_BASE_URL}/api/user/viewers`, config);
-        if (response.data && response.data.viewers) {
-          setVisitorCount(response.data.viewers.length);
-        }
-      }
-    } catch (error) {
-      // console.log("Error fetching visitors", error);
+      const { data } = await axios.get(`${API_BASE_URL}/api/user/viewers`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setVisitorCount(data?.viewers?.length || 0);
+    } catch {
+      // silent
     }
-  };
+  }, [token]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        dispatch(fetchNotifications({ page: 1, limit: 30 })),
+        dispatch(fetchUnreadNotificationCount()),
+        dispatch(fetchUnreadUserNotificationCount()),
+        dispatch(fetchUnreadMessageCount()),
+        fetchVisitorCount(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [dispatch, fetchVisitorCount]);
 
   useFocusEffect(
     useCallback(() => {
       if (token) {
-        // dispatch(fetchNotifications({ page: 1, limit: 30 }));
-        // dispatch(fetchUnreadNotificationCount());
-        // dispatch(fetchUnreadMessageCount());
-        // fetchVisitorCount();
         onRefresh();
       }
-    }, [token, dispatch])
+    }, [token, onRefresh]),
   );
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    // await dispatch(fetchNotifications({ page: 1, limit: 30 }));
-    // await dispatch(fetchUnreadNotificationCount());
-    // await fetchVisitorCount();
-
-    dispatch(fetchNotifications({ page: 1, limit: 30 }));
-    dispatch(fetchUnreadNotificationCount());
-    dispatch(fetchUnreadMessageCount());
-    fetchVisitorCount();
-    setRefreshing(false);
-  };
-
-
-  // ------------------------------------------------------------------
-  // 2. HELPER: Group by Date with Filtering
-  // ------------------------------------------------------------------
+  // ─────────────────────────────────────────────────────────────────────────
+  // Notifications: Group by Date
+  // ─────────────────────────────────────────────────────────────────────────
   const getGroupedNotifications = () => {
     if (!notifications || notifications.length === 0) return [];
 
-    // Filter First
-    const filteredList = notifications.filter(item => {
-      if (activeFilter === 'unread') return !item.isRead;
-      if (activeFilter === 'read') return item.isRead;
-      return true; // 'all'
-    }).sort((a, b) => {
-      const dateA = new Date(a.updatedAt || a.createdAt);
-      const dateB = new Date(b.updatedAt || b.createdAt);
-      return dateB - dateA; // Descending
-    });
+    const filteredList = notifications
+      .filter((item) => {
+        if (activeFilter === 'unread') return !item.isRead;
+        if (activeFilter === 'read') return item.isRead;
+        return true;
+      })
+      .sort((a, b) => {
+        const dA = new Date(a.updatedAt || a.createdAt);
+        const dB = new Date(b.updatedAt || b.createdAt);
+        return dB - dA;
+      });
 
     if (filteredList.length === 0) return [];
 
     const today = moment().startOf('day');
     const yesterday = moment().subtract(1, 'days').startOf('day');
+    const groups = { Today: [], Yesterday: [], Earlier: [] };
 
-    const groups = {
-      Today: [],
-      Yesterday: [],
-      Earlier: [],
-    };
-
-    filteredList.forEach(item => {
-      // Use updatedAt if available, else createdAt. 
-      // This ensures updated notifications (like messages) float to Today.
+    filteredList.forEach((item) => {
       const date = moment(item.updatedAt || item.createdAt);
-      if (date.isSameOrAfter(today)) {
-        groups.Today.push(item);
-      } else if (date.isSameOrAfter(yesterday)) {
-        groups.Yesterday.push(item);
-      } else {
-        groups.Earlier.push(item);
-      }
+      if (date.isSameOrAfter(today)) groups.Today.push(item);
+      else if (date.isSameOrAfter(yesterday)) groups.Yesterday.push(item);
+      else groups.Earlier.push(item);
     });
 
     const sections = [];
     if (groups.Today.length > 0)
       sections.push({ title: i18n.t('activity.sections.today') || 'Today', data: groups.Today });
     if (groups.Yesterday.length > 0)
-      sections.push({ title: i18n.t('activity.sections.yesterday') || 'Yesterday', data: groups.Yesterday });
+      sections.push({
+        title: i18n.t('activity.sections.yesterday') || 'Yesterday',
+        data: groups.Yesterday,
+      });
     if (groups.Earlier.length > 0)
-      sections.push({ title: i18n.t('activity.sections.earlier') || 'Earlier', data: groups.Earlier });
+      sections.push({
+        title: i18n.t('activity.sections.earlier') || 'Earlier',
+        data: groups.Earlier,
+      });
 
     return sections;
   };
 
-  // ------------------------------------------------------------------
-  // 3. NAVIGATION LOGIC
-  // ------------------------------------------------------------------
-  const getOrCreateChatId = async recipientId => {
+  // ─────────────────────────────────────────────────────────────────────────
+  // Navigation
+  // ─────────────────────────────────────────────────────────────────────────
+  const getOrCreateChatId = async (recipientId) => {
     if (!recipientId) return null;
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -161,57 +171,44 @@ const ActivityScreen = ({ navigation }) => {
         return response.data.chat._id;
       }
       return null;
-    } catch (error) {
+    } catch {
       return null;
     }
   };
 
+
   const handleNotificationPress = async (item) => {
     try {
-      // Mark as read immediately
       if (!item.isRead) {
-        dispatch(markOneNotificationAsRead(item._id));
-        dispatch(fetchUnreadNotificationCount());
+        await dispatch(markOneNotificationAsRead(item._id));
+        await dispatch(fetchUnreadNotificationCount());
+        await dispatch(fetchUnreadUserNotificationCount());
       }
 
       const type = item.type;
-      const referenceId = item.referenceId; // New Field
+      const referenceId = item.referenceId;
       const senderId = item.senderId?._id || item.senderId;
 
-      // --- REDIRECTION LOGIC ---
-
-      // A. Message -> Chat Screen
       if (type === 'message') {
-        // Ideally use referenceId as chatId if available, else find chat
         const chatId = referenceId || (await getOrCreateChatId(senderId));
         if (chatId) {
-          navigation.navigate('MessageScreen', { chatId });
+          navigation.navigate('MessageScreen', { chatId, notificationId: item._id });
         }
         return;
       }
-
-      // B. Interest -> Interest Details or Profile
       if (type === 'interest') {
-        // If we had an InterestDetailScreen, we'd go there:
-        // navigation.navigate('InterestDetailScreen', { interestId: referenceId });
-        // Fallback to profile for now, or if referenceId is lacking
-        if (senderId) navigation.navigate('ProfileDetailScreen', { profileId: senderId, item: { _id: senderId } });
+        if (senderId) await openProfileById({ _id: senderId });
         return;
       }
-
-      // C. Profile View -> Profile Detail
       if (type === 'view') {
-        if (senderId) navigation.navigate('ProfileDetailScreen', { profileId: senderId, item: { _id: senderId } });
+        if (senderId) await openProfileById({ _id: senderId });
         return;
       }
-
-      // D. Fallback / Default
       if (senderId) {
-        navigation.navigate('ProfileDetailScreen', { profileId: senderId, item: { _id: senderId } });
+        await openProfileById({ _id: senderId });
       }
-
-    } catch (error) {
-      //   console.error("Navigation error", error);
+    } catch {
+      // silent
     }
   };
 
@@ -221,27 +218,31 @@ const ActivityScreen = ({ navigation }) => {
     }
   };
 
-  // ------------------------------------------------------------------
-  // 4. UI COMPONENTS
-  // ------------------------------------------------------------------
+  // ─────────────────────────────────────────────────────────────────────────
+  // Notification Icon
+  // ─────────────────────────────────────────────────────────────────────────
   const getIcon = (type) => {
     switch (type) {
       case 'interest':
-        return { icon: 'heart', color: '#E91E63', lib: 'Ionicons' }; // Heart (Pink)
+        return { icon: 'heart', color: '#E91E63', lib: 'Ionicons' };
       case 'view':
-        return { icon: 'eye', color: COLORS.primary, lib: 'Ionicons' }; // Eye
+        return { icon: 'eye', color: COLORS.primary, lib: 'Ionicons' };
       case 'message':
-        return { icon: 'chatbubble-ellipses', color: COLORS.success, lib: 'Ionicons' }; // Chat
+        return { icon: 'chatbubble-ellipses', color: COLORS.success, lib: 'Ionicons' };
       case 'approval':
         return { icon: 'checkmark-circle', color: COLORS.success, lib: 'Ionicons' };
       default:
-        return { icon: 'notifications', color: COLORS.warning, lib: 'Ionicons' }; // Default bell
+        return { icon: 'notifications', color: COLORS.warning, lib: 'Ionicons' };
     }
   };
 
-  const renderItem = ({ item }) => {
-    const { icon, color, lib } = getIcon(item.type);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Renderers
+  // ─────────────────────────────────────────────────────────────────────────
+  const renderNotificationItem = ({ item }) => {
+    const { icon, color } = getIcon(item.type);
     const isUnread = !item.isRead;
+    const messageUnreadCount = item.type === 'message' ? Number(item.unreadCount ?? 0) : 0;
 
     return (
       <TouchableOpacity
@@ -249,31 +250,33 @@ const ActivityScreen = ({ navigation }) => {
         onPress={() => handleNotificationPress(item)}
         activeOpacity={0.8}
       >
-        {/* Left Icon */}
         <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
           <Ionicons name={icon} size={22} color={color} />
         </View>
 
-        {/* Content */}
         <View style={styles.contentContainer}>
           <Text style={[styles.messageText, isUnread && styles.boldText]} numberOfLines={2}>
             {item.message}
           </Text>
-          <Text style={styles.timeText}>{moment(item.updatedAt || item.createdAt).fromNow()}</Text>
+          <Text style={styles.timeText}>
+            {moment(item.updatedAt || item.createdAt).fromNow()}
+          </Text>
         </View>
 
-        {/* Unread Indicator (Dot or Count) */}
-        {isUnread && (
-          item.type === 'message' && item.count > 1 ? (
-            <View style={[styles.unreadDot, { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' }]}>
-              <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
-                {item.count > 99 ? '99+' : item.count}
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.unreadDot} />
-          )
-        )}
+        {isUnread && item.type === 'message' && messageUnreadCount > 0 ? (
+          <View
+            style={[
+              styles.unreadDot,
+              { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
+            ]}
+          >
+            <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
+              {messageUnreadCount > 99 ? '99+' : messageUnreadCount}
+            </Text>
+          </View>
+        ) : isUnread ? (
+          <View style={styles.unreadDot} />
+        ) : null}
       </TouchableOpacity>
     );
   };
@@ -284,65 +287,126 @@ const ActivityScreen = ({ navigation }) => {
     </View>
   );
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Visitor tab content
+  // ─────────────────────────────────────────────────────────────────────────
+  const renderVisitorContent = () => {
+    if (visitorsLoading) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#f6f6fb' }}>
+          <SkeletonList count={8} />
+        </View>
+      );
+    }
+
+    if (visitorsError) {
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={56} color={COLORS.gray + '80'} />
+          <Text style={styles.emptyText}>{visitorsError}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchVisitors}>
+            <Text style={styles.retryText}>{t('activityScreen.retry')}</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (visitors.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name="eye-off-outline" size={60} color={COLORS.gray + '80'} />
+          <Text style={styles.emptyText}>{t('activityScreen.noVisitors')}</Text>
+        </View>
+      );
+    }
+
+    return (
+      <FlatList
+        data={visitors}
+        keyExtractor={(item) => item._id}
+        renderItem={({ item }) => (
+          <VisitorCard
+            item={item}
+            onPress={() => openProfileById(item)}
+          />
+        )}
+        contentContainerStyle={{ paddingVertical: 8, paddingBottom: 30 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+        }
+      />
+    );
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Main render
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <CustomHeader titleKey="customeHeaders.activity" navigation={navigation} />
 
       <View style={styles.container}>
+
+        {/* ── Stats Row ─────────────────────────────────── */}
+        <View style={styles.statsRow}>
+          {/* Requests */}
+          <TouchableOpacity
+            style={styles.statsCard}
+            onPress={() => navigation.navigate('InterestedUsersScreen')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.statsCount}>{receivedInterests?.length || 0}</Text>
+            <Text style={styles.statsLabel}>{t('activityScreen.requests')}</Text>
+          </TouchableOpacity>
+
+          {/* Visitors — gated via handleViewVisitors, navigates to ProfileVisitorsScreen */}
+          <TouchableOpacity
+            style={styles.statsCard}
+            onPress={async () => {
+              const granted = await handleViewVisitors();
+              if (granted) navigation.navigate('ProfileVisitorsScreen');
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.statsCount}>{visitorCount}</Text>
+            <Text style={styles.statsLabel}>{t('activityScreen.visitors')}</Text>
+          </TouchableOpacity>
+
+          {/* Liked */}
+          <TouchableOpacity
+            style={styles.statsCard}
+            onPress={() => navigation.navigate('LikedProfiles')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.statsCount}>{likedProfiles?.length || 0}</Text>
+            <Text style={styles.statsLabel}>{t('activityScreen.liked')}</Text>
+          </TouchableOpacity>
+
+          {/* Blocked */}
+          <TouchableOpacity
+            style={styles.statsCard}
+            onPress={() => navigation.navigate('BlockedProfiles')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.statsCount}>{blockedProfiles?.length || 0}</Text>
+            <Text style={styles.statsLabel}>{t('activityScreen.blocked')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Notifications ─────────────────────────────── */}
         {loading && !refreshing && notifications.length === 0 ? (
           <SkeletonActivity count={8} />
         ) : (
           <>
-            {/* --- Stats / Quick Access Row --- */}
-            <View style={styles.statsRow}>
-              {/* Requests */}
-              <TouchableOpacity
-                style={styles.statsCard}
-                onPress={() => navigation.navigate('InterestedUsersScreen')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.statsCount}>{receivedInterests?.length || 0}</Text>
-                <Text style={styles.statsLabel}>Requests</Text>
-              </TouchableOpacity>
-
-              {/* Visitors */}
-              <TouchableOpacity
-                style={styles.statsCard}
-                onPress={() => navigation.navigate('ProfileVisitorsScreen')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.statsCount}>{visitorCount}</Text>
-                <Text style={styles.statsLabel}>Visitors</Text>
-              </TouchableOpacity>
-
-              {/* Liked */}
-              <TouchableOpacity
-                style={styles.statsCard}
-                onPress={() => navigation.navigate('LikedProfiles')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.statsCount}>{likedProfiles?.length || 0}</Text>
-                <Text style={styles.statsLabel}>Liked</Text>
-              </TouchableOpacity>
-
-              {/* Blocked */}
-              <TouchableOpacity
-                style={styles.statsCard}
-                onPress={() => navigation.navigate('BlockedProfiles')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.statsCount}>{blockedProfiles?.length || 0}</Text>
-                <Text style={styles.statsLabel}>Blocked</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* --- Filters Row --- */}
+            {/* Filters */}
             <View style={styles.filterContainer}>
               {['all', 'unread', 'read'].map((filter) => {
-                let label = 'All';
-                if (filter === 'unread') label = 'Unread';
-                if (filter === 'read') label = 'Read';
-
+                const label =
+                  filter === 'all'
+                    ? t('activityScreen.filterAll')
+                    : filter === 'unread'
+                      ? t('activityScreen.filterUnread')
+                      : t('activityScreen.filterRead');
                 const isActive = activeFilter === filter;
                 return (
                   <TouchableOpacity
@@ -361,7 +425,7 @@ const ActivityScreen = ({ navigation }) => {
             <SectionList
               sections={getGroupedNotifications()}
               keyExtractor={(item) => item._id}
-              renderItem={renderItem}
+              renderItem={renderNotificationItem}
               renderSectionHeader={renderSectionHeader}
               contentContainerStyle={{ paddingBottom: 20 }}
               stickySectionHeadersEnabled={false}
@@ -375,21 +439,41 @@ const ActivityScreen = ({ navigation }) => {
                 ) : null
               }
               refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={[COLORS.primary]}
+                />
               }
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <MaterialCommunityIcons name="bell-sleep-outline" size={60} color={COLORS.gray + '80'} />
-                  <Text style={styles.emptyText}>{i18n.t('activity.notifications.empty')}</Text>
+                  <MaterialCommunityIcons
+                    name="bell-sleep-outline"
+                    size={60}
+                    color={COLORS.gray + '80'}
+                  />
+                  <Text style={styles.emptyText}>
+                    {i18n.t('activity.notifications.empty')}
+                  </Text>
                 </View>
               }
             />
           </>
         )}
       </View>
+
+      {/* Subscription modal (from handleViewVisitors gate) */}
+      <SubscriptionModal
+        visible={subscriptionModalVisible}
+        message={subscriptionModalMessage}
+        onClose={() => setSubscriptionModalVisible(false)}
+        onUpgradePress={handleSubscriptionUpgrade}
+      />
     </SafeAreaView>
   );
 };
+
+export default ActivityScreen;
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -398,9 +482,10 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#f6f6fb', // Slightly gray bg for list contrast
+    backgroundColor: '#f6f6fb',
   },
-  // Stats Row
+
+  // ── Stats Row ───────────────────────────────────────────────────
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -411,21 +496,20 @@ const styles = StyleSheet.create({
   },
   statsCard: {
     flex: 1,
-    backgroundColor: '#ffffffff',
+    backgroundColor: '#fff',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    // Shadow
-    // shadowColor: '#000',
-    // shadowOffset: { width: 0, height: 1 },
-    // shadowOpacity: 0.05,
-    // shadowRadius: 2,
-    // elevation: 1,
+  },
+  statsCardActive: {
+    borderWidth: 1.5,
+    borderColor: COLORS.primary + '60',
+    backgroundColor: COLORS.primary + '08',
   },
   statsCount: {
     ...FONTS.h3,
-    color: '#C62828', // Red-ish color for numbers
+    color: '#C62828',
     marginBottom: 4,
     fontWeight: 'bold',
   },
@@ -434,11 +518,42 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     fontWeight: '500',
   },
-  // Filters
+
+  // ── Tab Switcher ────────────────────────────────────────────────
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: SIZES.padding,
+    marginBottom: 4,
+    gap: 10,
+  },
+  tabBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: '#eef0f5',
+  },
+  tabBtnActive: {
+    backgroundColor: COLORS.primary + '15',
+    borderWidth: 1,
+    borderColor: COLORS.primary + '40',
+  },
+  tabText: {
+    fontSize: 13,
+    color: COLORS.gray,
+    fontWeight: '500',
+  },
+  tabTextActive: {
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+
+  // ── Notification Filters ────────────────────────────────────────
   filterContainer: {
     flexDirection: 'row',
     paddingHorizontal: SIZES.padding,
-    paddingBottom: 8, // Spacing before list
+    paddingBottom: 8,
     marginTop: SIZES.base,
     gap: 10,
   },
@@ -448,7 +563,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     marginRight: 8,
-
   },
   activeFilterChip: {
     backgroundColor: COLORS.primary,
@@ -459,15 +573,14 @@ const styles = StyleSheet.create({
   },
   activeFilterText: {
     color: COLORS.white,
-    backgroundColor: COLORS.primary,
   },
-  // Section Header
+
+  // ── Section Header ──────────────────────────────────────────────
   sectionHeader: {
     paddingHorizontal: SIZES.padding,
     paddingVertical: SIZES.base,
     marginTop: SIZES.base,
   },
-
   sectionHeaderText: {
     ...FONTS.h4,
     color: COLORS.darkGray,
@@ -476,7 +589,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 4,
   },
-  // Card
+
+  // ── Notification Card ───────────────────────────────────────────
   notificationCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -486,8 +600,7 @@ const styles = StyleSheet.create({
     marginHorizontal: SIZES.padding,
     marginBottom: 8,
     borderRadius: 12,
-    // Soft Shadow
-    shadowColor: '#ffffffff',
+    shadowColor: '#fff',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 5,
@@ -497,10 +610,9 @@ const styles = StyleSheet.create({
   },
   unreadCard: {
     backgroundColor: COLORS.white,
-    borderColor: COLORS.primary + '70', // Light primary border for unread
+    borderColor: COLORS.primary + '70',
     borderWidth: 1,
   },
-  // Icon
   iconContainer: {
     width: 44,
     height: 44,
@@ -509,7 +621,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 14,
   },
-  // Content
   contentContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -521,14 +632,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   boldText: {
-    ...FONTS.h4, // Bolder font for unread
+    ...FONTS.h4,
     fontWeight: '600',
   },
   timeText: {
     fontSize: 11,
     color: COLORS.gray,
   },
-  // Unread Dot
   unreadDot: {
     width: 8,
     height: 8,
@@ -536,17 +646,96 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     marginLeft: 10,
   },
-  // Empty
+
+  // ── Visitor Card ────────────────────────────────────────────────
+  visitorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    paddingVertical: 12,
+    paddingHorizontal: SIZES.padding,
+    marginHorizontal: SIZES.padding,
+    marginBottom: 8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  visitorAvatarWrap: {
+    position: 'relative',
+    marginRight: 14,
+  },
+  visitorAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: COLORS.gray + '40',
+  },
+  premiumBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFA000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.white,
+  },
+  visitorInfo: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 2,
+  },
+  visitorName: {
+    ...FONTS.body4,
+    fontWeight: '600',
+    color: COLORS.black,
+    marginBottom: 2,
+  },
+  visitorSub: {
+    fontSize: 12,
+    color: COLORS.darkGray,
+    marginBottom: 2,
+  },
+  visitorLocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  visitorLoc: {
+    fontSize: 11,
+    color: COLORS.gray,
+    flexShrink: 1,
+  },
+
+  // ── Empty / Error ────────────────────────────────────────────────
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 100,
+    marginTop: 80,
+    paddingHorizontal: 30,
   },
   emptyText: {
     marginTop: 16,
     ...FONTS.body3,
     color: COLORS.gray,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+    borderRadius: 20,
+  },
+  retryText: {
+    color: COLORS.white,
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
-
-export default ActivityScreen;

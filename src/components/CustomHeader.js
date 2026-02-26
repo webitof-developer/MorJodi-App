@@ -1,65 +1,43 @@
-import React, { useEffect, useRef, useContext } from 'react';
+import React, { useContext } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import MIcon from 'react-native-vector-icons/MaterialCommunityIcons';
-import Entypo from 'react-native-vector-icons/Entypo';
-import { useSelector, useDispatch } from 'react-redux';
-import io from 'socket.io-client';
-import { API_BASE_URL } from '../constants/config';
-import { fetchUnreadNotificationCount } from '../redux/slices/notificationSlice';
-import { COLORS, SIZES, FONTS } from '../constants/theme';
+import { useSelector } from 'react-redux';
+import { COLORS } from '../constants/theme';
 import i18n from '../localization/i18n';
 import { LanguageContext } from '../contexts/LanguageContext';
-
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 
 const CustomHeader = ({ title, navigation, titleKey }) => {
   const navigationProp = navigation || useNavigation();
-  const { user } = useSelector(state => state.auth);
   const { unreadCount } = useSelector(state => state.notifications);
-  const dispatch = useDispatch();
-  const socketRef = useRef(null);
   const { language } = useContext(LanguageContext);
 
-  // ✅ Socket connection for real-time unread count updates
-  useEffect(() => {
-    if (!user?._id) return;
-
-    const socket = io(API_BASE_URL, { transports: ['websocket'] });
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      socket.emit('registerUser', user._id);
-    });
-
-    socket.on('unreadNotificationCount', () => {
-      dispatch(fetchUnreadNotificationCount());
-    });
-
-    return () => socket.disconnect();
-  }, [user?._id, dispatch]);
-
-  // Determine the title to display
   let displayTitle = title;
   if (titleKey) {
-    displayTitle = i18n.t(titleKey);
+    displayTitle = i18n.t(titleKey, { lng: language });
   } else if (title === 'Home') {
     displayTitle = 'MorJodi';
   }
 
+  const localizedHome = i18n.t('customeHeaders.home', { lng: language });
+  const showLogo =
+    titleKey === 'customeHeaders.home' ||
+    displayTitle === 'Home' ||
+    displayTitle === localizedHome ||
+    displayTitle === 'MorJodi' ||
+    displayTitle === 'Mor Jodi';
+
   return (
     <View style={styles.outerContainer}>
       <View style={styles.container}>
-        {/* Left: Menu Icon */}
         <View style={styles.leftContainer}>
           <TouchableOpacity onPress={() => navigationProp.dispatch(DrawerActions.openDrawer())}>
             <Icon name="menu-outline" size={26} color="#000000ff" />
           </TouchableOpacity>
         </View>
 
-        {/* Center: Title + Heart */}
         <View style={styles.middleContainer}>
-          {displayTitle === 'Home' || displayTitle === 'MorJodi' || displayTitle === 'Mor Jodi' ? (
+          {showLogo ? (
             <Image
               source={require('../assets/main-logo.png')}
               style={styles.headerLogo}
@@ -78,19 +56,18 @@ const CustomHeader = ({ title, navigation, titleKey }) => {
           )}
         </View>
 
-        {/* Right: Notification + Search */}
         <View style={styles.rightContainer}>
-          <TouchableOpacity onPress={() => navigation.navigate('Activity')}>
+          <TouchableOpacity onPress={() => navigationProp.navigate('Activity')}>
             <View>
               <Icon name="notifications-outline" size={24} color="#6b7280" />
               {unreadCount > 0 && (
                 <View style={styles.badgeContainer}>
-                  <Text style={styles.badgeText}>{unreadCount}</Text>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
                 </View>
               )}
             </View>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('IdWiseSearch')}>
+          <TouchableOpacity onPress={() => navigationProp.navigate('IdWiseSearch')}>
             <Icon name="search-outline" size={24} color="#6b7280" />
           </TouchableOpacity>
         </View>
@@ -105,7 +82,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingVertical: 0,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6', // Subtle separator
+    borderBottomColor: '#f3f4f6',
   },
   container: {
     flexDirection: 'row',
@@ -132,12 +109,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'normal',
-    color: '#5e3a45', // Dark brownish/red color from screenshot
+    color: '#5e3a45',
     fontFamily: undefined,
   },
   headerLogo: {
     height: 45,
-    width: 150, // Prevent it from overlapping side buttons
+    width: 150,
   },
   rightContainer: {
     flex: 1,
@@ -153,12 +130,13 @@ const styles = StyleSheet.create({
     top: -2,
     backgroundColor: COLORS.primary,
     borderRadius: 9,
-    width: 18,
+    minWidth: 18,
     height: 18,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: COLORS.white,
+    paddingHorizontal: 3,
   },
   badgeText: {
     color: 'white',

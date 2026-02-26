@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,7 @@ import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSocket } from '../components/SocketManager';
 import i18n from '../localization/i18n';
+import { LanguageContext } from '../contexts/LanguageContext';
 import SkeletonMessenger from '../components/SkeletonMessenger';
 
 const MessengerScreen = ({ navigation }) => {
@@ -46,6 +47,8 @@ const MessengerScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const dispatch = useDispatch();
   const { onlineUsers, socket } = useSocket();
+  const { language } = useContext(LanguageContext);
+  const t = (key, opts) => i18n.t(key, { locale: language, ...opts });
   const statusItems = useMemo(
     () =>
       chats
@@ -139,6 +142,12 @@ const MessengerScreen = ({ navigation }) => {
   useEffect(() => {
     if (!socket || !token || !user?._id) return;
 
+    const normalizeSenderId = sender => {
+      if (!sender) return null;
+      if (typeof sender === 'object') return String(sender._id || sender.id || '');
+      return String(sender);
+    };
+
     const handleNewMessage = message => {
       setChats(prevChats => {
         const updated = [...prevChats];
@@ -146,8 +155,17 @@ const MessengerScreen = ({ navigation }) => {
 
         if (index !== -1) {
           const chat = { ...updated[index] };
+          const prevLastMessageId = chat.lastMessage?._id
+            ? String(chat.lastMessage._id)
+            : null;
+          const incomingMessageId = message?._id ? String(message._id) : null;
+          const isDuplicateMessage =
+            !!incomingMessageId && incomingMessageId === prevLastMessageId;
+
           chat.lastMessage = message;
-          if (message.sender !== user._id) {
+          const senderId = normalizeSenderId(message.sender);
+          const isOwnMessage = !!senderId && senderId === String(user._id);
+          if (!isOwnMessage && !isDuplicateMessage) {
             chat.unreadCount = (chat.unreadCount || 0) + 1;
           }
           chat.updatedAt = new Date();
@@ -216,17 +234,17 @@ const MessengerScreen = ({ navigation }) => {
   }, [dispatch, navigation]);
 
   const getLastMessageText = useCallback(item => {
-    if (!item.lastMessage) return 'No messages yet';
+    if (!item.lastMessage) return t('messengerScreen.noMessages');
     const isMine = item.lastMessage.sender === user?._id;
     if (['voice_call', 'video_call'].includes(item.lastMessage.type)) {
       const callStatus = item.lastMessage.callStatus;
-      return `${isMine ? 'You: ' : ''}${item.lastMessage.type.replace(
+      return `${isMine ? t('messengerScreen.you') : ''}${item.lastMessage.type.replace(
         '_',
         ' ',
       )} - ${callStatus}`;
     }
-    return `${isMine ? 'You: ' : ''}${item.lastMessage.text || '[Image]'}`;
-  }, [user?._id]);
+    return `${isMine ? t('messengerScreen.you') : ''}${item.lastMessage.text || t('messengerScreen.image')}`;
+  }, [user?._id, language]);
 
   const renderItem = useCallback(({ item }) => (
     <TouchableOpacity
@@ -288,7 +306,7 @@ const MessengerScreen = ({ navigation }) => {
             <FontAwesome name="search" size={16} color="#9ca3af" />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search chats"
+              placeholder={t('messengerScreen.searchChats')}
               placeholderTextColor="#9ca3af"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -310,7 +328,7 @@ const MessengerScreen = ({ navigation }) => {
                   activeFilter === 'all' && styles.filterChipTextActive,
                 ]}
               >
-                All
+                {t('messengerScreen.all')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -326,7 +344,7 @@ const MessengerScreen = ({ navigation }) => {
                   activeFilter === 'unread' && styles.filterChipTextActive,
                 ]}
               >
-                Unread
+                {t('messengerScreen.unread')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -342,13 +360,13 @@ const MessengerScreen = ({ navigation }) => {
                   activeFilter === 'matches' && styles.filterChipTextActive,
                 ]}
               >
-                Matches
+                {t('messengerScreen.matches')}
               </Text>
             </TouchableOpacity>
           </View>
           {statusItems.length > 0 && (
             <View style={styles.statusRow}>
-              <Text style={styles.statusTitle}>Active now</Text>
+              <Text style={styles.statusTitle}>{t('messengerScreen.activeNow')}</Text>
               <FlatList
                 data={statusItems}
                 horizontal
@@ -368,7 +386,7 @@ const MessengerScreen = ({ navigation }) => {
                       />
                     </View>
                     <Text style={styles.statusName} numberOfLines={1}>
-                      {item.otherParticipant?.fullName || 'User'}
+                      {item.otherParticipant?.fullName || t('messengerScreen.user')}
                     </Text>
                   </View>
                 )}
@@ -407,10 +425,10 @@ const MessengerScreen = ({ navigation }) => {
             <FontAwesome name="comments-o" size={60} color={COLORS.gray} />
             <Text style={styles.emptyText}>
               {activeFilter === 'unread'
-                ? 'No unread chats'
+                ? t('messengerScreen.noUnreadChats')
                 : activeFilter === 'matches'
-                  ? 'No matches yet'
-                  : i18n.t('messenger.empty')}
+                  ? t('messengerScreen.noMatchesYet')
+                  : t('messenger.empty')}
             </Text>
           </View>
         )}

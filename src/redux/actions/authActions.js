@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../../constants/config';
 import { clearFilters } from '../slices/searchSlice';
 import { fetchSubscription } from '../slices/subscriptionSlice';
 import { generateNewFcmToken, clearFcmToken } from '../../utils/notificationHelper';
+import { isTokenExpired } from '../../utils/authSession';
 
 export const LOGIN_SUCCESS = 'LOGIN_SUCCESS';
 export const LOGOUT = 'LOGOUT';
@@ -106,7 +107,12 @@ export const checkToken = () => async dispatch => {
   dispatch(setLoading(true));
   try {
     const token = await AsyncStorage.getItem('token');
-    if (!token) {
+    if (!token || isTokenExpired(token)) {
+      if (token) {
+        await AsyncStorage.removeItem('token');
+      }
+      dispatch({ type: LOGOUT });
+      dispatch(clearFilters());
       dispatch(setLoading(false));
       return;
     }
@@ -122,8 +128,14 @@ export const checkToken = () => async dispatch => {
         await dispatch(loginSuccess({ token }));
       }
     } catch (error) {
-      // Even if profile fetch fails (e.g., network), keep the token so user stays logged in
-      await dispatch(loginSuccess({ token }));
+      if (error?.response?.status === 401) {
+        await AsyncStorage.removeItem('token');
+        dispatch({ type: LOGOUT });
+        dispatch(clearFilters());
+      } else {
+        // Keep token for non-auth failures (e.g., temporary network issue)
+        await dispatch(loginSuccess({ token }));
+      }
     }
   } finally {
     dispatch(setLoading(false));

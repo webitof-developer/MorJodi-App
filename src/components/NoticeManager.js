@@ -65,30 +65,59 @@ const NoticeManager = () => {
         setIsVisible(false);
         setCurrentNotice(null);
 
-        // Navigate
-        let { screen, params } = currentNotice.actionLink;
-
-        // Map Legacy/Admin Friendly names to Routes
-        const routeMapping = {
-            'Plans': 'Upgrade',
-            'UploadDocuments': 'EditProfile',
+        const normalizeParams = (value) => {
+            if (!value) return {};
+            if (typeof value === 'string') {
+                try {
+                    const parsed = JSON.parse(value);
+                    return parsed && typeof parsed === 'object' ? parsed : {};
+                } catch {
+                    return {};
+                }
+            }
+            return typeof value === 'object' ? value : {};
         };
 
-        if (routeMapping[screen]) {
-            screen = routeMapping[screen];
-        }
+        const navigateToHomeTab = (tabName, tabParams = {}) => {
+            navigate('App', {
+                screen: 'HomeTabs',
+                params: {
+                    screen: tabName,
+                    ...(Object.keys(tabParams).length > 0 ? { params: tabParams } : {}),
+                },
+            });
+        };
 
-        if (screen) {
-            // Handle Navigation
-            // E.g. EditProfile, UploadDocuments, Plans
-            // We use 'navigate' from navigationRef
-            try {
-                // If params is object, pass it. If string, parse it? 
-                // Schema has Mixed type, usually object from Mongoose lean().
-                navigate(screen, params || {});
-            } catch (e) {
-                console.error("Navigation failed", e);
+        const navigateFromNotice = (screenName, rawParams) => {
+            const params = normalizeParams(rawParams);
+            const screen = String(screenName || '').trim();
+            if (!screen) return;
+
+            // Legacy names sent from admin panel.
+            if (screen === 'Plans') {
+                navigateToHomeTab('Upgrade');
+                return;
             }
+            if (screen === 'UploadDocuments') {
+                navigate('EditProfile', params);
+                return;
+            }
+
+            // Bottom tabs are nested under App -> HomeTabs.
+            const bottomTabScreens = ['Home', 'Matches', 'Messenger', 'Activity', 'Upgrade'];
+            if (bottomTabScreens.includes(screen)) {
+                navigateToHomeTab(screen, params);
+                return;
+            }
+
+            // Normal stack screen.
+            navigate(screen, params);
+        };
+
+        try {
+            navigateFromNotice(currentNotice?.actionLink?.screen, currentNotice?.actionLink?.params);
+        } catch (e) {
+            console.error("Navigation failed", e);
         }
     };
 
