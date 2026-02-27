@@ -28,6 +28,32 @@ const SocketManager = ({ user, children }) => {
   const appState = useRef(AppState.currentState);
 
   const [onlineUsers, setOnlineUsers] = useState({});
+  const unreadRefreshTimerRef = useRef(null);
+  const normalizeId = React.useCallback((value) => {
+    if (!value) return null;
+    if (typeof value === 'object') {
+      const maybeId = value._id || value.id;
+      return maybeId ? String(maybeId) : null;
+    }
+    const raw = String(value).trim();
+    if (!raw || raw === 'undefined' || raw === 'null') return null;
+    return raw;
+  }, []);
+
+  const scheduleUnreadRefresh = React.useCallback(
+    (delayMs = 350) => {
+      if (unreadRefreshTimerRef.current) {
+        clearTimeout(unreadRefreshTimerRef.current);
+      }
+      unreadRefreshTimerRef.current = setTimeout(() => {
+        dispatch(fetchUnreadNotificationCount());
+        dispatch(fetchUnreadUserNotificationCount());
+        dispatch(fetchUnreadMessageCount());
+        unreadRefreshTimerRef.current = null;
+      }, delayMs);
+    },
+    [dispatch],
+  );
 
   // ========================================================
   // MAIN EFFECT
@@ -45,7 +71,15 @@ const SocketManager = ({ user, children }) => {
       socketRef.current.disconnect();
     }
 
-    const socket = io(API_BASE_URL, { transports: ["websocket"] });
+    const socket = io(API_BASE_URL, {
+      transports: ["websocket"],
+      timeout: 10000,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 600,
+      reconnectionDelayMax: 8000,
+      randomizationFactor: 0.5,
+    });
     socketRef.current = socket;
 
     // --------------------------------------------------------
@@ -54,9 +88,7 @@ const SocketManager = ({ user, children }) => {
     socket.on("connect", () => {
       console.log("🟢 Socket connected");
       socket.emit("registerUser", user._id);
-      dispatch(fetchUnreadNotificationCount());
-      dispatch(fetchUnreadUserNotificationCount());
-      dispatch(fetchUnreadMessageCount());
+      scheduleUnreadRefresh(0);
     });
 
     // --------------------------------------------------------
@@ -82,28 +114,23 @@ const SocketManager = ({ user, children }) => {
     socket.on("new_notification", (notification) => {
       console.log("New notification:", notification);
       dispatch(addNotification(notification));
-      dispatch(fetchUnreadNotificationCount());
-      dispatch(fetchUnreadUserNotificationCount()); // Keep updating badge count
+      scheduleUnreadRefresh();
     });
 
     socket.on("notification_count_update", () => {
-      dispatch(fetchUnreadNotificationCount());
-      dispatch(fetchUnreadUserNotificationCount());
+      scheduleUnreadRefresh();
     });
 
     socket.on("newMessage", (message) => {
       if (message.sender !== user._id) {
-        dispatch(fetchUnreadMessageCount());
-        dispatch(fetchUnreadUserNotificationCount());
+        scheduleUnreadRefresh();
       }
     });
 
     socket.on("messageStatusUpdate", (data) => {
       // If status is read, update unread counts
       if (data?.status === 'read') {
-        dispatch(fetchUnreadMessageCount());
-        dispatch(fetchUnreadNotificationCount());
-        dispatch(fetchUnreadUserNotificationCount());
+        scheduleUnreadRefresh();
       }
     });
 
@@ -111,16 +138,20 @@ const SocketManager = ({ user, children }) => {
     // ONLINE / OFFLINE STATUS
     // --------------------------------------------------------
     socket.on("user_status_update", ({ userId, status, lastActive }) => {
+      const normalizedUserId = normalizeId(userId);
+      if (!normalizedUserId) return;
       setOnlineUsers((prev) => ({
         ...prev,
-        [userId]: { status, lastActive },
+        [normalizedUserId]: { status, lastActive },
       }));
     });
 
     socket.on("initial_user_statuses", (statuses) => {
       const formatted = {};
       statuses.forEach((u) => {
-        formatted[u.userId] = {
+        const normalizedUserId = normalizeId(u.userId);
+        if (!normalizedUserId) return;
+        formatted[normalizedUserId] = {
           status: u.status,
           lastActive: u.lastActive,
         };
@@ -170,13 +201,24 @@ const SocketManager = ({ user, children }) => {
     // CLEANUP
     // --------------------------------------------------------
     return () => {
+      if (unreadRefreshTimerRef.current) {
+        clearTimeout(unreadRefreshTimerRef.current);
+        unreadRefreshTimerRef.current = null;
+      }
       if (subscription) subscription.remove();
       if (socketRef.current) {
+        if (user?._id) {
+          socketRef.current.emit("user_status_update", {
+            userId: user._id,
+            status: "offline",
+            lastActive: new Date(),
+          });
+        }
         socketRef.current.removeAllListeners();
         socketRef.current.disconnect();
       }
     };
-  }, [user?._id]);
+  }, [user?._id, scheduleUnreadRefresh, normalizeId]);
 
   // --------------------------------------------------------
   // PROVIDER

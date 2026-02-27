@@ -107,7 +107,7 @@ const ComplaintScreen = ({ navigation, route }) => {
 
   const handleCreateSubmit = async () => {
     if (!subject || !message) {
-      Alert.alert('Error', 'Please fill in all fields.');
+      Alert.alert(i18n.t('complaint.errorTitle'), i18n.t('complaint.errorFill'));
       return;
     }
     try {
@@ -130,13 +130,13 @@ const ComplaintScreen = ({ navigation, route }) => {
       });
 
       if (res.data.success) {
-        Alert.alert('Success', 'Complaint submitted successfully.');
+        Alert.alert(i18n.t('complaint.successTitle'), i18n.t('complaint.successMsg'));
         setSubject(''); setMessage(''); setSelectedImage(null);
         setViewMode('list');
         fetchUserComplaints();
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to submit complaint.');
+      Alert.alert(i18n.t('complaint.errorTitle'), i18n.t('complaint.errorSubmit'));
     } finally {
       setSubmitting(false);
     }
@@ -154,7 +154,7 @@ const ComplaintScreen = ({ navigation, route }) => {
       setReplyMessage('');
       await reloadComplaintDetails(selectedComplaint._id);
     } catch (error) {
-      Alert.alert('Error', 'Failed to send reply.');
+      Alert.alert(i18n.t('complaint.errorTitle'), i18n.t('complaint.errorReply'));
     } finally {
       setSendingReply(false);
     }
@@ -179,7 +179,9 @@ const ComplaintScreen = ({ navigation, route }) => {
     }
     return (
       <View style={{ backgroundColor: bg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
-        <Text style={{ color: color, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }}>{status}</Text>
+        <Text style={{ color: color, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' }}>
+          {i18n.t(`complaint.status.${status === 'in progress' ? 'inProgress' : status}`)}
+        </Text>
       </View>
     );
   };
@@ -198,7 +200,7 @@ const ComplaintScreen = ({ navigation, route }) => {
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
         <Text style={styles.idText}>#{item._id.slice(-6).toUpperCase()}</Text>
         {item.status === 'solved' || item.status === 'closed' ? null : (
-          <Text style={{ fontSize: 12, color: COLORS.primary }}>Tap to view discussion</Text>
+          <Text style={{ fontSize: 12, color: COLORS.primary }}>{i18n.t('complaint.tapToView')}</Text>
         )}
       </View>
     </TouchableOpacity>
@@ -209,54 +211,54 @@ const ComplaintScreen = ({ navigation, route }) => {
   if (viewMode === 'create') {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setViewMode('list')}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.black} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>New Complaint</Text>
-          <View style={{ width: 24 }} />
-        </View>
+
         <ScrollView contentContainerStyle={{ padding: 20 }}>
-          <Text style={styles.label}>Complaint Type</Text>
+          <Text style={styles.label}>{i18n.t('complaint.typeLabel')}</Text>
           <View style={styles.pickerWrapper}>
             <Picker
               selectedValue={complaintType}
               onValueChange={setComplaintType}
               enabled={!route.params?.reportedUserId}
             >
-              <Picker.Item label="General Issue" value="other" />
-              <Picker.Item label="Report User" value="user" />
+              <Picker.Item label={i18n.t('complaint.generalIssue')} value="other" />
+              <Picker.Item label={i18n.t('complaint.reportUser')} value="user" />
             </Picker>
           </View>
 
           {complaintType === 'user' && (
             <>
-              <Text style={styles.label}>Reported User ID</Text>
+              <Text style={styles.label}>{i18n.t('complaint.reportedUserLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={reportedUserId}
                 onChangeText={setReportedUserId}
                 editable={!route.params?.reportedUserId}
+                placeholder={i18n.t('complaint.reportedUserPlaceholder')}
               />
             </>
           )}
 
-          <Text style={styles.label}>Subject</Text>
-          <TextInput style={styles.input} value={subject} onChangeText={setSubject} placeholder="Brief summary" />
+          <Text style={styles.label}>{i18n.t('complaint.subjectLabel')}</Text>
+          <TextInput
+            style={styles.input}
+            value={subject}
+            onChangeText={setSubject}
+            placeholder={i18n.t('complaint.briefSummary')}
+          />
 
-          <Text style={styles.label}>Message</Text>
+          <Text style={styles.label}>{i18n.t('complaint.messageLabel')}</Text>
           <TextInput
             style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
             value={message}
             onChangeText={setMessage}
             multiline
-            placeholder="Describe your issue detailedly..."
+            placeholder={i18n.t('complaint.describeIssue')}
           />
 
           <TouchableOpacity style={styles.imageBtn} onPress={handleImagePick}>
             <MaterialIcons name="add-photo-alternate" size={24} color={COLORS.darkGray} />
             <Text style={{ marginLeft: 10, color: COLORS.darkGray }}>
-              {selectedImage ? 'Image Selected' : 'Attach Image (Optional)'}
+              {selectedImage ? i18n.t('complaint.imageSelected') : i18n.t('complaint.attachImage')}
             </Text>
           </TouchableOpacity>
 
@@ -265,7 +267,7 @@ const ComplaintScreen = ({ navigation, route }) => {
             onPress={handleCreateSubmit}
             disabled={submitting}
           >
-            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Submit Ticket</Text>}
+            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>{i18n.t('complaint.submitTicket')}</Text>}
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -286,7 +288,7 @@ const ComplaintScreen = ({ navigation, route }) => {
             <Ionicons name="arrow-back" size={24} color={COLORS.black} />
           </TouchableOpacity>
           <View style={{ alignItems: 'center' }}>
-            <Text style={styles.headerTitle}>Ticket Details</Text>
+            <Text style={styles.headerTitle}>{i18n.t('complaint.ticketDetails')}</Text>
             <Text style={{ fontSize: 10, color: COLORS.darkGray }}>#{selectedComplaint._id.slice(-6).toUpperCase()}</Text>
           </View>
           <View style={{ width: 24 }} />
@@ -329,7 +331,7 @@ const ComplaintScreen = ({ navigation, route }) => {
             )
           }}
           ListEmptyComponent={
-            <Text style={{ textAlign: 'center', marginTop: 20, color: COLORS.gray }}>No messages yet.</Text>
+            <Text style={{ textAlign: 'center', marginTop: 20, color: COLORS.gray }}>{i18n.t('complaint.noMessages')}</Text>
           }
         />
 
@@ -339,7 +341,7 @@ const ComplaintScreen = ({ navigation, route }) => {
             <View style={styles.inputBar}>
               <TextInput
                 style={styles.replyInput}
-                placeholder="Type a reply..."
+                placeholder={i18n.t('complaint.typeReply')}
                 value={replyMessage}
                 onChangeText={setReplyMessage}
                 multiline
@@ -372,7 +374,7 @@ const ComplaintScreen = ({ navigation, route }) => {
           ListEmptyComponent={
             <View style={{ alignItems: 'center', marginTop: 50 }}>
               <FontAwesome name="inbox" size={50} color={COLORS.lightGray} />
-              <Text style={{ color: COLORS.gray, marginTop: 10 }}>No complaints found.</Text>
+              <Text style={{ color: COLORS.gray, marginTop: 10 }}>{i18n.t('complaint.empty')}</Text>
             </View>
           }
         />

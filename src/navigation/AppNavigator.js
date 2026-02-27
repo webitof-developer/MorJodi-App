@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { AppState } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useSelector, useDispatch } from 'react-redux';
@@ -70,11 +71,14 @@ const AppNavigator = () => {
     dispatch(fetchUnreadNotificationCount());
     dispatch(fetchUnreadUserNotificationCount());
 
-    // Continuous polling (throttled to 30s; foreground FCM also updates counts)
-    const interval = setInterval(() => {
+    const poll = () => {
+      if (AppState.currentState !== 'active') return;
       dispatch(fetchUnreadNotificationCount());
       dispatch(fetchUnreadUserNotificationCount());
-    }, 30000);
+    };
+
+    // Continuous polling as fallback; push/socket already update eagerly.
+    const interval = setInterval(poll, 60000);
 
     return () => clearInterval(interval);
   }, [isAuthenticated, dispatch]);

@@ -588,7 +588,19 @@
         },
         "adminResponse": "Admin Response",
         "submittedOn": "Submitted On",
-        "reportedUser": "Reported User ID"
+        "reportedUser": "Reported User ID",
+        "ticketDetails": "Ticket Details",
+        "noMessages": "No messages yet.",
+        "typeReply": "Type a reply...",
+        "tapToView": "Tap to view discussion",
+        "imageSelected": "Image Selected",
+        "attachImage": "Attach Image (Optional)",
+        "errorReply": "Failed to send reply.",
+        "submitTicket": "Submit Ticket",
+        "generalIssue": "General Issue",
+        "reportUser": "Report User",
+        "briefSummary": "Brief summary",
+        "describeIssue": "Describe your issue detailedly..."
     },
     "contact": {
         "errorLoad": "Failed to load contact information.",

@@ -32,6 +32,7 @@ import UpdateManager from './src/components/UpdateManager';
 import NoticeManager from './src/components/NoticeManager';
 import { logout } from './src/redux/actions/authActions';
 import { isTokenExpired } from './src/utils/authSession';
+import { installNetworkClient } from './src/services/networkClient';
 import {
   clearChatMessageNotification,
   displayPersonEventNotification,
@@ -40,6 +41,7 @@ import {
 
 const PENDING_NOTIFICATION_NAVIGATION_KEY = 'pending_notification_navigation';
 const GLOBAL_ERROR_SCREEN_EXEMPT_ROUTES = new Set(['Register', 'EditProfile']);
+installNetworkClient();
 
 const AppContent = () => {
   const { user, token, isAuthenticated } = useSelector(state => state.auth);

@@ -7,6 +7,7 @@ const UserStatus = ({ isOnline, lastActive, variant = 'default' }) => {
     if (!date) return null;
     const now = new Date();
     const lastActiveDate = new Date(date);
+    if (Number.isNaN(lastActiveDate.getTime())) return null;
     const diffSeconds = Math.floor((now - lastActiveDate) / 1000);
     const diffMinutes = Math.floor(diffSeconds / 60);
     const diffHours = Math.floor(diffMinutes / 60);
@@ -18,17 +19,19 @@ const UserStatus = ({ isOnline, lastActive, variant = 'default' }) => {
     if (diffDays === 1) return 'yesterday';
     return `${diffDays}d ago`;
   };
+  const online = isOnline === true || String(isOnline).toLowerCase() === 'online';
+  const lastSeenText = formatLastActive(lastActive);
 
   // ✅ Small Variant (for MessageScreen header)
   if (variant === 'small') {
     return (
       <View style={styles.smallContainer}>
-        {isOnline && <View style={styles.greenDot} />}
+        {online && <View style={styles.greenDot} />}
         <Text style={styles.smallText}>
-          {isOnline
+          {online
             ? 'Online'
-            : lastActive
-              ? `Last seen ${formatLastActive(lastActive)}`
+            : lastSeenText
+              ? `Last seen ${lastSeenText}`
               : 'Offline'}
         </Text>
       </View>
@@ -38,12 +41,12 @@ const UserStatus = ({ isOnline, lastActive, variant = 'default' }) => {
   // ✅ Default Variant (for Profile / MatchCard)
   return (
     <View style={styles.container}>
-      {isOnline && <View style={styles.greenDot} />}
+      {online && <View style={styles.greenDot} />}
       <Text style={styles.defaultText}>
-        {isOnline
+        {online
           ? 'Online'
-          : lastActive
-            ? `Offline (${formatLastActive(lastActive)})`
+          : lastSeenText
+            ? `Offline (${lastSeenText})`
             : 'Offline'}
       </Text>
     </View>

@@ -4,7 +4,7 @@
 const ENV = {
   // API_BASE_URL: 'https://api.morjodi.com',
   // // API_BASE_URL: 'http://192.168.1.62:5000',
-  API_BASE_URL: 'http://10.99.44.194:5000',
+  API_BASE_URL: 'http://192.168.43.72:5000',
   // // // API_BASE_URL: 'http://172.20.10.2:5000', 
 
   WEB_CLIENT_ID:
