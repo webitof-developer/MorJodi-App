@@ -909,7 +909,13 @@
         "notice": "सचन",
         "unableToSendMessage": "सदेश नई भेजा जा सकय।",
         "failedToSendMessage": "संदेश भेजे मं दिक्कत आइस।",
-        "unableToOpenProfile": "प्रोफाइल खोले मं दिक्कत आइस।"
+        "unableToOpenProfile": "प्रोफाइल खोले मं दिक्कत आइस।",
+        "saveImage": "सेव",
+        "cancel": "रद्द",
+        "saveImageTitle": "इमेज सेव करव",
+        "saveImageConfirm": "का तुमन ए इमेज ला अपन डिवाइस मं सेव करना चाहत हव?",
+        "imageSavedSuccess": "इमेज तुमर डिवाइस मं सेव होगे।",
+        "unableToSaveImage": "इमेज सेव नई होइस।"
     },
     "messengerScreen": {
         "searchChats": "चट खजव",

@@ -17,6 +17,8 @@ import ImageView from 'react-native-image-viewing';
 import { useSelector, useDispatch } from 'react-redux';
 import axios from 'axios';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { CameraRoll } from '@react-native-camera-roll/camera-roll';
+import RNFS from 'react-native-fs';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { API_BASE_URL } from '../constants/config';
 import { COLORS, SIZES, FONTS } from '../constants/theme';
@@ -31,11 +33,24 @@ import {
 } from '../redux/slices/notificationSlice';
 import { fetchUnreadMessageCount } from '../redux/slices/messageSlice';
 import SubscriptionModal from '../components/SubscriptionModal';
+import AwesomeAlert from '../components/AwesomeAlert';
+import SuccessPopup from '../components/SuccessPopup';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LanguageContext } from '../contexts/LanguageContext';
 import i18n from '../localization/i18n';
 import { useProfileActions } from '../contexts/ProfileActionsContext';
 import { clearChatMessageNotification } from '../utils/chatNotificationHelper';
+
+const MAX_UPLOAD_SIZE_MB = 5;
+const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+];
 
 const MessageScreen = ({ route, navigation }) => {
   const { chatId, notificationId } = route.params || {};
@@ -63,6 +78,15 @@ const MessageScreen = ({ route, navigation }) => {
   const activeChatIdRef = useRef(null);
   const { onlineUsers, socket } = useSocket();
   const [fullScreenImage, setFullScreenImage] = useState(null);
+  const [replyTarget, setReplyTarget] = useState(null);
+  const [selectedMessageId, setSelectedMessageId] = useState(null);
+  const [saveImageConfirmVisible, setSaveImageConfirmVisible] = useState(false);
+  const [successPopup, setSuccessPopup] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'success',
+  });
 
   const normalizeId = value => {
     if (!value) return null;
@@ -267,6 +291,33 @@ const MessageScreen = ({ route, navigation }) => {
 
 
   // ✅ Image Picker
+  const getImageValidationMessage = useCallback((asset) => {
+    if (!asset) return t('register.validationtext.imagePickFailed');
+    if (asset.type && !ALLOWED_IMAGE_MIME_TYPES.includes(asset.type)) {
+      return t('register.validationtext.invalidImageType');
+    }
+    if (asset.fileSize && asset.fileSize > MAX_UPLOAD_SIZE_BYTES) {
+      return t('register.validationtext.imageTooLarge', {
+        size: MAX_UPLOAD_SIZE_MB,
+      });
+    }
+    if (!asset.uri) return t('register.validationtext.imagePickFailed');
+    return '';
+  }, [t]);
+
+  const getAssetSizeBytes = useCallback(async (asset) => {
+    if (!asset) return 0;
+    if (Number(asset.fileSize) > 0) return Number(asset.fileSize);
+    if (!asset.uri) return 0;
+    try {
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      return Number(blob?.size || 0);
+    } catch (e) {
+      return 0;
+    }
+  }, []);
+
   const pickImage = async () => {
     if (Platform.OS === 'android') {
       const permission =
@@ -291,6 +342,7 @@ const MessageScreen = ({ route, navigation }) => {
       maxWidth: 1280,
       maxHeight: 1280,
       includeBase64: false,
+      includeExtra: true,
     };
 
     launchImageLibrary(options, async res => {
@@ -304,7 +356,17 @@ const MessageScreen = ({ route, navigation }) => {
         Alert.alert(t('messageScreen.error'), t('messageScreen.unableToSelectImage'));
         return;
       }
-      await sendMessage(null, asset);
+      const resolvedSize = await getAssetSizeBytes(asset);
+      const validatedAsset = {
+        ...asset,
+        fileSize: resolvedSize || asset.fileSize,
+      };
+      const imageValidationMessage = getImageValidationMessage(validatedAsset);
+      if (imageValidationMessage) {
+        Alert.alert(t('register.validation'), imageValidationMessage);
+        return;
+      }
+      await sendMessage(null, validatedAsset);
     });
   };
 
@@ -315,6 +377,89 @@ const MessageScreen = ({ route, navigation }) => {
     navigation.navigate('HomeTabs', { screen: 'Upgrade' });
   };
 
+  const handleReplyMessage = useCallback((message) => {
+    if (!message?._id) return;
+    setSelectedMessageId(String(message._id));
+    setReplyTarget({
+      messageId: message._id,
+      sender: normalizeId(message.sender),
+      text: message.text || '',
+      imageUrl: message.imageUrl || message.localImageUri || '',
+    });
+  }, []);
+
+  const clearReplyTarget = useCallback(() => {
+    setReplyTarget(null);
+    setSelectedMessageId(null);
+  }, []);
+
+  const saveCurrentImageToDevice = useCallback(async () => {
+    if (!fullScreenImage) return;
+    let downloadedFilePath = null;
+    try {
+      if (Platform.OS === 'android' && Platform.Version <= 28) {
+        const hasWritePermission = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        );
+        if (!hasWritePermission) {
+          const granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          );
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            Alert.alert(t('messageScreen.permissionRequired'), t('messageScreen.allowPhotoAccess'));
+            return;
+          }
+        }
+      }
+
+      let sourceUri = fullScreenImage;
+      const isRemote = /^https?:\/\//i.test(fullScreenImage);
+      if (isRemote) {
+        const extensionMatch = fullScreenImage.match(/\.(jpg|jpeg|png|webp|heic|heif)(\?|$)/i);
+        const extension = extensionMatch ? extensionMatch[1] : 'jpg';
+        downloadedFilePath = `${RNFS.CachesDirectoryPath}/morjodi_${Date.now()}.${extension}`;
+
+        const download = RNFS.downloadFile({
+          fromUrl: fullScreenImage,
+          toFile: downloadedFilePath,
+          background: true,
+        });
+        const result = await download.promise;
+        if (result.statusCode < 200 || result.statusCode >= 300) {
+          throw new Error('Failed to download image');
+        }
+        sourceUri = `file://${downloadedFilePath}`;
+      }
+
+      await CameraRoll.save(sourceUri, { type: 'photo', album: 'MorJodi' });
+      setSuccessPopup({
+        visible: true,
+        title: t('common.success'),
+        message: t('messageScreen.imageSavedSuccess'),
+        type: 'success',
+      });
+    } catch (e) {
+      Alert.alert(t('messageScreen.error'), t('messageScreen.unableToSaveImage'));
+    } finally {
+      if (downloadedFilePath) {
+        RNFS.unlink(downloadedFilePath).catch(() => { });
+      }
+    }
+  }, [fullScreenImage, t]);
+
+  const openImageOptions = useCallback(() => {
+    setSaveImageConfirmVisible(true);
+  }, []);
+
+  const closeImageSaveConfirm = useCallback(() => {
+    setSaveImageConfirmVisible(false);
+  }, []);
+
+  const confirmImageSave = useCallback(async () => {
+    setSaveImageConfirmVisible(false);
+    await saveCurrentImageToDevice();
+  }, [saveCurrentImageToDevice]);
+
   const sendMessage = async (textMessage, imageAsset = null) => {
     const text =
       typeof textMessage === 'string'
@@ -323,6 +468,14 @@ const MessageScreen = ({ route, navigation }) => {
     if (!text && !imageAsset) return;
 
     const clientId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const normalizedReply = replyTarget?.messageId
+      ? {
+        messageId: replyTarget.messageId,
+        sender: replyTarget.sender,
+        text: replyTarget.text || '',
+        imageUrl: replyTarget.imageUrl || '',
+      }
+      : null;
     const optimisticMessage = {
       _id: clientId,
       clientId,
@@ -335,10 +488,12 @@ const MessageScreen = ({ route, navigation }) => {
       status: 'sent',
       createdAt: new Date().toISOString(),
       pending: true,
+      ...(normalizedReply ? { replyTo: normalizedReply } : {}),
     };
 
     setMessages(prev => [optimisticMessage, ...prev]);
     setInputText('');
+    clearReplyTarget();
     scrollToBottom();
 
     if (imageAsset) setUploading(true);
@@ -349,6 +504,7 @@ const MessageScreen = ({ route, navigation }) => {
         const formData = new FormData();
         if (text) formData.append('text', text);
         formData.append('clientId', clientId);
+        if (normalizedReply) formData.append('replyTo', JSON.stringify(normalizedReply));
         formData.append('image', {
           uri: imageAsset.uri,
           type: imageAsset.type || 'image/jpeg',
@@ -361,13 +517,14 @@ const MessageScreen = ({ route, navigation }) => {
           {
             headers: {
               Authorization: `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data',
             },
           },
         );
       } else {
         res = await axios.post(
           `${API_BASE_URL}/api/chat/${chatId}/send`,
-          { text, clientId },
+          { text, clientId, ...(normalizedReply ? { replyTo: normalizedReply } : {}) },
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -389,13 +546,14 @@ const MessageScreen = ({ route, navigation }) => {
 
       // ✅ backend may send success=false with known code
       if (
+        data.code === 'IMAGE_NOT_ALLOWED' ||
         data.code === 'IMAGE_PREMIUM_REQUIRED' ||
         data.code === 'LIMIT_REACHED'
       ) {
         setMessages(prev => prev.filter(m => m.clientId !== clientId));
         setSubscriptionModalMessage(null);
         setSubscriptionModalMessageKey(
-          data.code === 'IMAGE_PREMIUM_REQUIRED'
+          data.code === 'IMAGE_PREMIUM_REQUIRED' || data.code === 'IMAGE_NOT_ALLOWED'
             ? 'subscriptionModel.image_premium_required'
             : 'subscriptionModel.message_limit_reached',
         );
@@ -424,11 +582,17 @@ const MessageScreen = ({ route, navigation }) => {
       const code = res.code;
       const msg = res.message || 'Failed to send message.';
 
-      if (code === 'IMAGE_PREMIUM_REQUIRED' || code === 'LIMIT_REACHED') {
+      if (code === 'FILE_TOO_LARGE' || code === 'INVALID_FILE_TYPE') {
+        setMessages(prev => prev.filter(m => m.clientId !== clientId));
+        Alert.alert(t('register.validation'), res.message || t('messageScreen.unableToSendMessage'));
+        return;
+      }
+
+      if (code === 'IMAGE_PREMIUM_REQUIRED' || code === 'IMAGE_NOT_ALLOWED' || code === 'LIMIT_REACHED') {
         setMessages(prev => prev.filter(m => m.clientId !== clientId));
         setSubscriptionModalMessage(null);
         setSubscriptionModalMessageKey(
-          code === 'IMAGE_PREMIUM_REQUIRED'
+          code === 'IMAGE_PREMIUM_REQUIRED' || code === 'IMAGE_NOT_ALLOWED'
             ? 'subscriptionModel.image_premium_required'
             : 'subscriptionModel.message_limit_reached',
         );
@@ -495,12 +659,25 @@ const MessageScreen = ({ route, navigation }) => {
     };
 
     return (
-      <View
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onLongPress={() => handleReplyMessage(item)}
+      >
+        <View
         style={[
           styles.messageBubble,
           isMine ? styles.myMessage : styles.theirMessage,
+          selectedMessageId === String(item._id) && styles.selectedMessageBubble,
         ]}
       >
+        {(item.replyTo?.text || item.replyTo?.imageUrl) ? (
+          <View style={styles.replyPreviewBubble}>
+            <Text style={styles.replyPreviewLabel}>Reply</Text>
+            <Text style={styles.replyPreviewText} numberOfLines={1}>
+              {item.replyTo?.text || 'Photo'}
+            </Text>
+          </View>
+        ) : null}
         {(item.imageUrl || item.localImageUri) && (
           <TouchableOpacity onPress={() => setFullScreenImage(item.imageUrl || item.localImageUri)}>
             <Image
@@ -528,8 +705,9 @@ const MessageScreen = ({ route, navigation }) => {
           </View>
         </View>
       </View>
+      </TouchableOpacity>
     );
-  }, [user?._id]);
+  }, [user?._id, handleReplyMessage, selectedMessageId]);
 
   const keyExtractor = useCallback(
     item => String(item?._id || item?.clientId || `${item?.createdAt || Date.now()}`),
@@ -628,6 +806,20 @@ const MessageScreen = ({ route, navigation }) => {
           keyboardShouldPersistTaps="handled"
           onContentSizeChange={scrollToBottom}
         />
+        {replyTarget ? (
+          <View style={styles.replyComposer}>
+            <View style={styles.replyComposerBody}>
+              <Text style={styles.replyComposerTitle}>Replying to message</Text>
+              <Text style={styles.replyComposerText} numberOfLines={1}>
+                {replyTarget.text || 'Photo'}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={clearReplyTarget} style={styles.replyComposerClose}>
+              <Icon name="close" size={20} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         <View style={styles.inputContainer}>
           <TouchableOpacity onPress={pickImage} style={styles.plusButton}>
             <Icon name="add" size={32} color="#111827" />
@@ -670,7 +862,40 @@ const MessageScreen = ({ route, navigation }) => {
           images={[{ uri: fullScreenImage }]}
           imageIndex={0}
           visible={!!fullScreenImage}
+          onLongPress={saveCurrentImageToDevice}
+          HeaderComponent={() => (
+            <View style={styles.imageViewerHeader}>
+              <TouchableOpacity style={styles.imageViewerSaveButton} onPress={openImageOptions}>
+                <Icon name="download-outline" size={18} color="#fff" />
+                <Text style={styles.imageViewerSaveText}>{t('messageScreen.saveImage')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           onRequestClose={() => setFullScreenImage(null)}
+        />
+        <AwesomeAlert
+          show={saveImageConfirmVisible}
+          showProgress={false}
+          title={t('messageScreen.saveImageTitle')}
+          message={t('messageScreen.saveImageConfirm')}
+          closeOnTouchOutside
+          closeOnHardwareBackPress={false}
+          showCancelButton
+          showConfirmButton
+          cancelText={t('messageScreen.cancel')}
+          confirmText={t('messageScreen.saveImage')}
+          confirmButtonColor={COLORS.primary}
+          onCancelPressed={closeImageSaveConfirm}
+          onConfirmPressed={confirmImageSave}
+          titleStyle={{ fontSize: 17, fontWeight: 'bold' }}
+          messageStyle={{ fontSize: 14, textAlign: 'center' }}
+        />
+        <SuccessPopup
+          visible={successPopup.visible}
+          title={successPopup.title}
+          message={successPopup.message}
+          type={successPopup.type}
+          onClose={() => setSuccessPopup(prev => ({ ...prev, visible: false }))}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -728,6 +953,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eceff4',
   },
+  selectedMessageBubble: {
+    borderColor: COLORS.primary,
+    borderWidth: 1.5,
+  },
+  replyPreviewBubble: {
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+    backgroundColor: '#f4f6fb',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 6,
+  },
+  replyPreviewLabel: {
+    ...FONTS.body6,
+    color: COLORS.primary,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  replyPreviewText: {
+    ...FONTS.body5,
+    color: '#4b5563',
+  },
   theirMessage: {
     backgroundColor: COLORS.white,
     alignSelf: 'flex-start',
@@ -755,6 +1003,35 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white, // Or #121212 if dark mode required, but user asked for light theme UI logic
     borderTopWidth: 1,
     borderTopColor: '#eef0f5', // Light border
+  },
+  replyComposer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f8fafc',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  replyComposerBody: {
+    flex: 1,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+    paddingLeft: 10,
+  },
+  replyComposerTitle: {
+    ...FONTS.body6,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  replyComposerText: {
+    ...FONTS.body5,
+    color: '#374151',
+    marginTop: 1,
+  },
+  replyComposerClose: {
+    marginLeft: 10,
+    padding: 4,
   },
   plusButton: {
     marginRight: 10,
@@ -810,5 +1087,25 @@ const styles = StyleSheet.create({
   tickIcon: { marginLeft: 4 },
   statusWrapper: {
     marginLeft: 0,
+  },
+  imageViewerHeader: {
+    width: '100%',
+    paddingTop: 50,
+    paddingHorizontal: 16,
+    alignItems: 'flex-end',
+  },
+  imageViewerSaveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(17, 24, 39, 0.75)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+  imageViewerSaveText: {
+    ...FONTS.body5,
+    color: '#fff',
+    marginLeft: 6,
+    fontWeight: '600',
   },
 });

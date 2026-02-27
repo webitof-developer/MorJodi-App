@@ -976,7 +976,13 @@
         "notice": "सूचना",
         "unableToSendMessage": "सदश भजन म असमरथ",
         "failedToSendMessage": "सदश भजन म वफल",
-        "unableToOpenProfile": "परफइल खलन म समसय आई"
+        "unableToOpenProfile": "परफइल खलन म समसय आई",
+        "saveImage": "सेव",
+        "cancel": "रद्द करें",
+        "saveImageTitle": "इमेज सेव करें",
+        "saveImageConfirm": "क्या आप इस इमेज को अपने डिवाइस में सेव करना चाहते हैं?",
+        "imageSavedSuccess": "इमेज आपके डिवाइस में सेव हो गई।",
+        "unableToSaveImage": "इमेज सेव नहीं हो पाई।"
     },
     "messengerScreen": {
         "searchChats": "चट खज",

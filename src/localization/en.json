@@ -976,7 +976,13 @@
         "notice": "Notice",
         "unableToSendMessage": "Unable to send message.",
         "failedToSendMessage": "Failed to send message.",
-        "unableToOpenProfile": "Unable to open profile."
+        "unableToOpenProfile": "Unable to open profile.",
+        "saveImage": "Save",
+        "cancel": "Cancel",
+        "saveImageTitle": "Save Image",
+        "saveImageConfirm": "Do you want to save this image to your device?",
+        "imageSavedSuccess": "Image saved to your device.",
+        "unableToSaveImage": "Unable to save image."
     },
     "messengerScreen": {
         "searchChats": "Search chats",
