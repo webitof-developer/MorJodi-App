@@ -35,6 +35,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LanguageContext } from '../contexts/LanguageContext';
 import i18n from '../localization/i18n';
 import { useProfileActions } from '../contexts/ProfileActionsContext';
+import { clearChatMessageNotification } from '../utils/chatNotificationHelper';
 
 const MessageScreen = ({ route, navigation }) => {
   const { chatId, notificationId } = route.params || {};
@@ -92,6 +93,8 @@ const MessageScreen = ({ route, navigation }) => {
       dispatch(fetchUnreadUserNotificationCount()),
       dispatch(fetchUnreadMessageCount()),
     ]);
+
+    await clearChatMessageNotification({ chatId });
   }, [chatId, token, notificationId, dispatch]);
 
   const status = chatInfo?._id

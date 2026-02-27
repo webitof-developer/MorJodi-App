@@ -32,6 +32,11 @@ import UpdateManager from './src/components/UpdateManager';
 import NoticeManager from './src/components/NoticeManager';
 import { logout } from './src/redux/actions/authActions';
 import { isTokenExpired } from './src/utils/authSession';
+import {
+  clearChatMessageNotification,
+  displayPersonEventNotification,
+  upsertChatMessageNotification,
+} from './src/utils/chatNotificationHelper';
 
 const PENDING_NOTIFICATION_NAVIGATION_KEY = 'pending_notification_navigation';
 const GLOBAL_ERROR_SCREEN_EXEMPT_ROUTES = new Set(['Register', 'EditProfile']);
@@ -386,8 +391,11 @@ const AppContent = () => {
             dispatch(fetchUnreadUserNotificationCount());
             dispatch(fetchUnreadMessageCount());
 
-            // Foreground rule: only show push popup for chat messages.
-            if (messageType !== 'message') return;
+            // Show custom styled notification for supported types.
+            const personEventTypes = new Set(['interest', 'view', 'interest_accepted', 'interest_declined']);
+            if (messageType !== 'message' && !personEventTypes.has(String(messageType || '').toLowerCase())) {
+              return;
+            }
 
             const currentRoute = navigationRef.isReady()
               ? navigationRef.getCurrentRoute()
@@ -398,37 +406,21 @@ const AppContent = () => {
 
             // Suppress notification if user is already inside same chat.
             if (
+              messageType === 'message' &&
               isInsideMessageScreen &&
               openedChatId &&
               incomingChatId &&
               String(openedChatId) === String(incomingChatId)
             ) {
+              await clearChatMessageNotification({ chatId: incomingChatId });
               return;
             }
 
-            const notificationTitle =
-              remoteMessage?.notification?.title ||
-              data?.title ||
-              data?.notificationTitle ||
-              'New Message';
-            const notificationBody =
-              remoteMessage?.notification?.body ||
-              data?.body ||
-              data?.message ||
-              data?.notificationBody ||
-              '';
-
-            if (!notificationTitle && !notificationBody) return;
-
-            await notifee.displayNotification({
-              title: notificationTitle,
-              body: notificationBody,
-              data,
-              android: {
-                channelId: 'default',
-                pressAction: { id: 'default' },
-              },
-            });
+            if (String(messageType || '').toLowerCase() === 'message') {
+              await upsertChatMessageNotification({ remoteMessage });
+            } else {
+              await displayPersonEventNotification({ remoteMessage });
+            }
           });
 
           unsubscribeNotificationOpened = messaging().onNotificationOpenedApp(async remoteMessage => {

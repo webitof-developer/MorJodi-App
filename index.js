@@ -7,6 +7,10 @@ import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import App from './App';
 import { name as appName } from './app.json';
+import {
+  displayPersonEventNotification,
+  upsertChatMessageNotification,
+} from './src/utils/chatNotificationHelper';
 
 const PENDING_NOTIFICATION_NAVIGATION_KEY = 'pending_notification_navigation';
 
@@ -72,6 +76,16 @@ messaging().setBackgroundMessageHandler(async (remoteMessage) => {
     name: "Default Channel",
     importance: AndroidImportance.HIGH,
   });
+
+  const messageType = String(remoteMessage?.data?.type || '').toLowerCase();
+  if (messageType === 'message') {
+    await upsertChatMessageNotification({ remoteMessage });
+    return;
+  }
+  if (['interest', 'view', 'interest_accepted', 'interest_declined'].includes(messageType)) {
+    await displayPersonEventNotification({ remoteMessage });
+    return;
+  }
 
   // Avoid duplicate background notifications when payload already has `notification`.
   // OS will show those automatically in background/quit.
