@@ -83,8 +83,8 @@ android {
         applicationId "com.morjodi"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 5
-        versionName "1.5"
+        versionCode 6
+        versionName "1.6"
         externalNativeBuild {
             cmake {
                 // NDK r27 removed the gold linker; use lld and avoid LTO probe failures.
